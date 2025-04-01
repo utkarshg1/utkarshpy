@@ -11,7 +11,7 @@ pip install utkarshpy
 ## Usage
 
 ```bash
-python -m utkarshpy
+utkarshpy
 ```
 
 ## Features
@@ -29,7 +29,7 @@ python -m utkarshpy
 
 1. **Run the CLI Tool:**
    ```bash
-   python -m utkarshpy
+   utkarshpy
    ```
 2. **Enter the Repository Name:**
    - The tool prompts you to enter a name for your GitHub repository.
