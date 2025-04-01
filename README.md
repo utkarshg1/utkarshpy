@@ -5,7 +5,7 @@ CLI tool to automate Python project setup with GitHub integration and VS Code co
 ## Installation
 
 ```bash
-pip install UtkarshPy
+pip install utkarshpy
 ```
 
 ## Usage
