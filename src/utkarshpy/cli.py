@@ -212,7 +212,7 @@ def setup_virtualenv():
     if os.path.exists("requirements.txt"):
         print("\n📦 Installing dependencies...")
         run_command(
-            f"{activate_cmd} && uv -r requirements.txt", live_output=True
+            f"{activate_cmd} && uv pip install -r requirements.txt", live_output=True
         )
         print("✓ Dependencies installed")
     else:
