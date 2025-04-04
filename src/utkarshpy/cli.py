@@ -179,12 +179,18 @@ def create_github_repo(repo_name, visibility="public"):
 
 def setup_virtualenv():
     """Create virtual environment and install dependencies."""
+    # Check if uv is installed
+    uv_check = run_command("uv --version", check=False)
+    if uv_check.returncode != 0:  # type: ignore
+        print("\n✗ uv is not installed. Installing via pip...")
+        run_command(f"{sys.executable} -m pip install uv", live_output=True)
+    
     venv_dir = "venv"
 
     # Create virtual environment
     if not os.path.exists(venv_dir):
         print("\n🔄 Creating virtual environment...")
-        run_command("python -m venv venv")
+        run_command(f"uv venv {venv_dir}")
         print("✓ Virtual environment created")
     else:
         print("\n✓ Virtual environment exists")
@@ -199,14 +205,14 @@ def setup_virtualenv():
     # Upgrade pip
     print("\n🔄 Upgrading pip...")
     run_command(
-        f"{activate_cmd} && python -m pip install --upgrade pip", live_output=True
+        f"{activate_cmd} && uv pip install --upgrade pip", live_output=True
     )
 
     # Install requirements
     if os.path.exists("requirements.txt"):
         print("\n📦 Installing dependencies...")
         run_command(
-            f"{activate_cmd} && pip install -r requirements.txt", live_output=True
+            f"{activate_cmd} && uv -r requirements.txt", live_output=True
         )
         print("✓ Dependencies installed")
     else:
