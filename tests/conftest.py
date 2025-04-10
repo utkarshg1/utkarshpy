@@ -1,11 +1,15 @@
+# conftest.py
+
 # tests/conftest.py
 import os
 import sys
 import io
+import json
 import subprocess
 import pytest
+from unittest.mock import MagicMock
 
-# 1) Make sure pytest can import from src/utkarshpy
+# Make sure pytest can import from src/utkarshpy
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
@@ -14,7 +18,7 @@ if SRC not in sys.path:
 import utkarshpy.cli as cli  # now importable
 
 
-# --- Fake process objects for subprocess.run / Popen ---
+# --- Mock Classes ---
 class FakeCompletedProcess:
     def __init__(self, returncode=0, stdout="", stderr=""):
         self.returncode = returncode
@@ -23,47 +27,205 @@ class FakeCompletedProcess:
 
 
 class FakePopen:
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, command=None, shell=None, stdout=None, stderr=None, text=None):
+        self.command = command
+        self.shell = shell
+        self.stdout = stdout if stdout is not None else io.StringIO()
+        self.stderr = stderr if stderr is not None else io.StringIO()
+        self.text = text
+        self._returncode = 0
 
     def communicate(self):
-        return ("", "")
+        return (self.stdout.getvalue(), self.stderr.getvalue())
 
     @property
     def returncode(self):
-        return 0
+        return self._returncode
+
+    @returncode.setter
+    def returncode(self, value):
+        self._returncode = value
 
 
-# 2) Autouse fixture to stub subprocess calls
-@pytest.fixture(autouse=True)
-def patch_subprocess(monkeypatch):
-    # stub subprocess.run → always “succeeds”
-    monkeypatch.setattr(
-        subprocess,
-        "run",
-        lambda cmd, shell, check, text, stdout, stderr: FakeCompletedProcess(),
-    )
-    # stub subprocess.Popen → always “succeeds”
+# --- Custom Command Router ---
+class CommandRouter:
+    """Routes mock responses for different shell commands"""
+
+    def __init__(self):
+        self.responses = {
+            # Default responses for common commands
+            "gh --version": FakeCompletedProcess(
+                returncode=0, stdout="gh version 2.35.0"
+            ),
+            "gh auth status": FakeCompletedProcess(
+                returncode=0, stdout="✓ Logged in to github.com as testuser"
+            ),
+            "git config --global user.name": FakeCompletedProcess(
+                returncode=0, stdout="Test User\n"
+            ),
+            "git config --global user.email": FakeCompletedProcess(
+                returncode=0, stdout="user@example.com\n"
+            ),
+            "git rev-parse --is-inside-work-tree": FakeCompletedProcess(
+                returncode=0, stdout="true\n"
+            ),
+            "git remote": FakeCompletedProcess(returncode=0, stdout=""),
+            "gh api user -q .login": FakeCompletedProcess(
+                returncode=0, stdout="testuser\n"
+            ),
+            "uv --version": FakeCompletedProcess(returncode=0, stdout="uv 1.0.0\n"),
+            "git init -b main": FakeCompletedProcess(returncode=0, stdout=""),
+            "git add .": FakeCompletedProcess(returncode=0, stdout=""),
+            "git commit -m 'Initial commit'": FakeCompletedProcess(
+                returncode=0, stdout=""
+            ),
+            "gh repo create test-repo --public": FakeCompletedProcess(
+                returncode=0, stdout="https://github.com/testuser/test-repo"
+            ),
+            "gh repo create test-repo --private": FakeCompletedProcess(
+                returncode=0, stdout="https://github.com/testuser/test-repo"
+            ),
+            "uv venv venv": FakeCompletedProcess(returncode=0, stdout=""),
+            "uv pip install -r requirements.txt": FakeCompletedProcess(
+                returncode=0, stdout=""
+            ),
+            "pip install uv": FakeCompletedProcess(returncode=0, stdout=""),
+        }
+
+    def run_command(
+        self, cmd, shell=True, check=True, text=True, stdout=None, stderr=None, **kwargs
+    ):
+        """Match commands and return appropriate responses"""
+        # Try exact matches first
+        if cmd in self.responses:
+            response = self.responses[cmd]
+            if check and response.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    response.returncode,
+                    cmd,
+                    output=response.stdout,
+                    stderr=response.stderr,
+                )
+            return response
+
+        # Then check for partial matches (more specific matches should be added above if needed)
+        for command, response in self.responses.items():
+            if command in cmd:
+                if check and response.returncode != 0:
+                    raise subprocess.CalledProcessError(
+                        response.returncode,
+                        cmd,
+                        output=response.stdout,
+                        stderr=response.stderr,
+                    )
+                return response
+
+        # Default success response if no match
+        return FakeCompletedProcess(returncode=0, stdout="", stderr="")
+
+    def set_response(self, command, returncode=0, stdout="", stderr=""):
+        """Set a custom response for a command"""
+        self.responses[command] = FakeCompletedProcess(
+            returncode=returncode, stdout=stdout, stderr=stderr
+        )
+
+    def clear_responses(self):
+        """Reset to default responses"""
+        self.__init__()
+
+
+# --- Network-related mocks ---
+class FakeResponse(io.BytesIO):
+    """Mock for urlopen responses"""
+
+    def __init__(self, content=b"FAKE-DATA", status=200, headers=None):
+        super().__init__(content)
+        self.status = status
+        self.headers = headers or {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def getcode(self):
+        return self.status
+
+
+# --- Fixtures ---
+@pytest.fixture
+def command_router():
+    """Fixture to access and configure the command router"""
+    router = CommandRouter()
+    yield router
+    router.clear_responses()
+
+
+@pytest.fixture
+def mock_subprocess(monkeypatch, command_router):
+    """Fixture to mock subprocess with command routing"""
+    monkeypatch.setattr(subprocess, "run", command_router.run_command)
     monkeypatch.setattr(subprocess, "Popen", FakePopen)
-    yield
+    yield command_router
 
 
-# 3) Autouse fixture to stub network downloads via urlopen
-@pytest.fixture(autouse=True)
-def patch_urlopen(monkeypatch):
-    class FakeResponse(io.BytesIO):
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
+@pytest.fixture
+def mock_urlopen(monkeypatch):
+    """Fixture to mock URL downloads"""
+    url_content_map = {
+        "https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore": b"# Python gitignore\n*.pyc\n__pycache__/\n",
+        "https://raw.githubusercontent.com/apache/.github/main/LICENSE": b"Apache License Version 2.0",
+    }
 
     def fake_urlopen(url):
-        # return  some dummy bytes
-        return FakeResponse(b"FAKE-DATA")
+        content = url_content_map.get(url, b"DEFAULT CONTENT")
+        return FakeResponse(content)
 
-    # patch the name that cli.py imported
     monkeypatch.setattr(cli, "urlopen", fake_urlopen)
-    yield
+    return url_content_map
+
+
+@pytest.fixture
+def temp_project_dir(tmp_path):
+    """Create a temporary project directory and cd into it"""
+    orig_dir = os.getcwd()
+    os.chdir(tmp_path)
+    yield tmp_path
+    os.chdir(orig_dir)
+
+
+@pytest.fixture
+def mock_inputs(monkeypatch):
+    """Mock user input with configurable values"""
+    inputs = []
+
+    def mock_input(prompt=""):
+        if not inputs:
+            return ""
+        return inputs.pop(0)
+
+    monkeypatch.setattr("builtins.input", mock_input)
+    return inputs
+
+
+@pytest.fixture
+def mock_file_exists(monkeypatch):
+    """Mock os.path.exists with configurable values"""
+    existing_files = set()
+
+    def mock_exists(path):
+        return path in existing_files
+
+    monkeypatch.setattr(os.path, "exists", mock_exists)
+    return existing_files
+
+
+@pytest.fixture
+def disable_system_exit(monkeypatch):
+    """Prevent sys.exit from exiting during tests"""
+
+    def mock_exit(code=0):
+        raise SystemExit(code)
+
+    monkeypatch.setattr(sys, "exit", mock_exit)
