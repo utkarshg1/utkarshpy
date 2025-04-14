@@ -184,7 +184,7 @@ def setup_virtualenv():
     if uv_check.returncode != 0:  # type: ignore
         print("\n✗ uv is not installed. Installing via pip...")
         run_command(f"{sys.executable} -m pip install uv", live_output=True)
-    
+
     venv_dir = "venv"
 
     # Create virtual environment
@@ -195,28 +195,24 @@ def setup_virtualenv():
     else:
         print("\n✓ Virtual environment exists")
 
+    # Upgrade pip
+    print("\n🔄 Upgrading pip...")
+    run_command("uv pip install --upgrade pip", live_output=True)
+
+    # Install requirements
+    if os.path.exists("requirements.txt"):
+        print("\n📦 Installing dependencies...")
+        run_command("uv pip install -r requirements.txt", live_output=True)
+        print("✓ Dependencies installed")
+    else:
+        print("\nℹ️ No requirements.txt found")
+
     # Platform-specific activation commands
     activate_cmd = (
         "venv\\Scripts\\activate.bat"
         if sys.platform == "win32"
         else "source venv/bin/activate"
     )
-
-    # Upgrade pip
-    print("\n🔄 Upgrading pip...")
-    run_command(
-        f"{activate_cmd} && uv pip install --upgrade pip", live_output=True
-    )
-
-    # Install requirements
-    if os.path.exists("requirements.txt"):
-        print("\n📦 Installing dependencies...")
-        run_command(
-            f"{activate_cmd} && uv pip install -r requirements.txt", live_output=True
-        )
-        print("✓ Dependencies installed")
-    else:
-        print("\nℹ️ No requirements.txt found")
 
     # Activation instructions
     print("\n🔌 Virtual environment activation:")
