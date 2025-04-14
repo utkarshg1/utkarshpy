@@ -203,7 +203,7 @@ def setup_virtualenv():
 
     # Upgrade pip
     print("\n🔄 Upgrading pip...")
-    run_command(f"f{activate_cmd} && uv pip install --upgrade pip", live_output=True)
+    run_command(f"{activate_cmd} && uv pip install --upgrade pip", live_output=True)
 
     # Install requirements
     if os.path.exists("requirements.txt"):
