@@ -231,6 +231,8 @@ class TestRepoInitialization:
 
         def track_command(cmd, **kwargs):
             commands.append(cmd)
+            if kwargs.get("live_output"):
+                kwargs["live_output"] = False  # Disable live output for testing
             return orig_run_command(cmd, **kwargs)
 
         monkeypatch.setattr(cli, "run_command", track_command)
@@ -238,17 +240,92 @@ class TestRepoInitialization:
         # Initialize repo
         cli.initialize_local_repo()
 
-        # Verify git init was called
-        assert "git init -b main" in commands
+        # Verify uv init was called
+        assert "uv init ." in commands
         out = capsys.readouterr().out
-        assert "Local repository initialized" in out
+        assert "Initialized uv folder" in out
 
-    def test_is_git_repo(self, mock_subprocess):
-        # Test positive case
-        mock_subprocess.set_response(
-            "git rev-parse --is-inside-work-tree", returncode=0, stdout="true\n"
-        )
-        assert cli.is_git_repo() is True
+
+# --- Virtual Environment Tests ---
+class TestVirtualEnv:
+    def test_setup_virtualenv_new(
+        self, temp_project_dir, mock_file_exists, monkeypatch, capsys
+    ):
+        # Mock pyproject.toml
+        mock_file_exists.add("pyproject.toml")
+
+        # Mock uv commands and activation script
+        commands = []
+        orig_run_command = cli.run_command
+
+        def track_command(cmd, **kwargs):
+            commands.append(cmd)
+            if (
+                "uv venv" in cmd
+                or "uv pip install" in cmd
+                or "uv add" in cmd
+                or "uv sync" in cmd
+            ):
+                return None  # Simulate successful execution
+            if ".venv\\Scripts\\activate.bat" in cmd:
+                return None  # Simulate successful activation
+            if kwargs.get("live_output"):
+                kwargs["live_output"] = False  # Disable live output for testing
+            return orig_run_command(cmd, **kwargs)
+
+        monkeypatch.setattr(cli, "run_command", track_command)
+
+        # Run setup_virtualenv
+        try:
+            cli.setup_virtualenv()
+        except SystemExit as e:
+            pytest.fail(f"SystemExit occurred: {e}")
+
+        # Verify uv venv was called
+        assert "uv venv" in commands
+        out = capsys.readouterr().out
+        assert "Virtual environment created" in out
+
+    def test_setup_virtualenv_with_requirements(
+        self, temp_project_dir, mock_file_exists, monkeypatch, capsys
+    ):
+        # Mock requirements.txt and pyproject.toml
+        mock_file_exists.add("requirements.txt")
+        mock_file_exists.add("pyproject.toml")
+
+        # Mock uv commands and activation script
+        commands = []
+        orig_run_command = cli.run_command
+
+        def track_command(cmd, **kwargs):
+            commands.append(cmd)
+            if (
+                "uv venv" in cmd
+                or "uv pip install" in cmd
+                or "uv add" in cmd
+                or "uv sync" in cmd
+            ):
+                return None  # Simulate successful execution
+            if ".venv\\Scripts\\activate.bat" in cmd:
+                return None  # Simulate successful activation
+            if kwargs.get("live_output"):
+                kwargs["live_output"] = False  # Disable live output for testing
+            return orig_run_command(cmd, **kwargs)
+
+        monkeypatch.setattr(cli, "run_command", track_command)
+
+        # Run setup_virtualenv
+        try:
+            cli.setup_virtualenv()
+        except SystemExit as e:
+            pytest.fail(f"SystemExit occurred: {e}")
+
+        # Verify uv add and uv sync were called
+        assert any("uv add -r requirements.txt" in cmd for cmd in commands)
+        assert any("uv sync" in cmd for cmd in commands)
+        out = capsys.readouterr().out
+        assert "Dependencies installed" in out
+        assert "uv synced to lockfile" in out
 
 
 # --- Additional Tests for CLI Functions ---

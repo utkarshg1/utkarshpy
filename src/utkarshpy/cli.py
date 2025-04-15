@@ -12,6 +12,12 @@ from urllib.error import HTTPError
 from urllib.request import urlopen
 
 
+class MissingPyprojectTomlError(Exception):
+    """Custom exception for missing pyproject.toml file."""
+
+    pass
+
+
 # --- Utility Functions ---
 def run_command(command, check=True, live_output=False):
     """Run a shell command with error handling and optional real-time output."""
@@ -113,9 +119,20 @@ def initialize_local_repo():
         print("✓ Git repository already exists")
         return
 
-    print("🔄 Initializing local repository...")
-    run_command("git init -b main")
-    print("✓ Local repository initialized")
+    # Check if uv is installed
+    uv_check = run_command("uv --version", check=False)
+    if uv_check.returncode != 0:
+        print("\n✗ uv is not installed. Installing via pip...")
+        run_command(f"{sys.executable} -m pip install uv", live_output=True)
+
+    print("\n🔄 Initializing local uv git repository...")
+    # do uv init
+    if not os.path.exists("pyproject.toml"):
+        run_command("uv init .", live_output=True)
+        print("✓ Initialized uv folder")
+
+    if os.path.exists(".gitignore"):
+        os.remove(".gitignore")
 
 
 def create_basic_files():
@@ -136,11 +153,10 @@ def create_basic_files():
         )
 
     # README.md
-    if not os.path.exists("README.md"):
-        repo_name = os.path.basename(os.getcwd())
-        with open("README.md", "w") as f:
-            f.write(f"# {repo_name}\n\n## Project Description\n")
-        print("✓ Created README.md")
+    repo_name = os.path.basename(os.getcwd())
+    with open("README.md", "w") as f:
+        f.write(f"# {repo_name}\n\n## Project Description\n")
+    print("✓ Created README.md")
 
 
 def create_github_repo(repo_name, visibility="public"):
@@ -179,13 +195,8 @@ def create_github_repo(repo_name, visibility="public"):
 
 def setup_virtualenv():
     """Create virtual environment and install dependencies."""
-    # Check if uv is installed
-    uv_check = run_command("uv --version", check=False)
-    if uv_check.returncode != 0:  # type: ignore
-        print("\n✗ uv is not installed. Installing via pip...")
-        run_command(f"{sys.executable} -m pip install uv", live_output=True)
 
-    venv_dir = "venv"
+    venv_dir = ".venv"
     # Platform-specific activation commands
     activate_cmd = (
         f"{venv_dir}\\Scripts\\activate.bat"
@@ -193,25 +204,47 @@ def setup_virtualenv():
         else f"source {venv_dir}/bin/activate"
     )
 
+    # Check for pyproject.toml
+    if not os.path.exists("pyproject.toml"):
+        raise MissingPyprojectTomlError(
+            "✗ Missing pyproject.toml. Please ensure it exists in the project directory."
+        )
+
     # Create virtual environment
     if not os.path.exists(venv_dir):
         print("\n🔄 Creating virtual environment...")
-        run_command(f"uv venv {venv_dir}")
-        print("✓ Virtual environment created")
+        try:
+            run_command(f"uv venv", live_output=True)
+            print("✓ Virtual environment created")
+        except SystemExit:
+            print("✗ Failed to create virtual environment")
+            sys.exit(1)
     else:
         print("\n✓ Virtual environment exists")
 
     # Upgrade pip
     print("\n🔄 Upgrading pip...")
-    run_command(f"{activate_cmd} && uv pip install --upgrade pip", live_output=True)
+    try:
+        run_command(f"{activate_cmd} && uv pip install --upgrade pip", live_output=True)
+    except SystemExit:
+        print("✗ Failed to upgrade pip")
+        sys.exit(1)
 
     # Install requirements
     if os.path.exists("requirements.txt"):
         print("\n📦 Installing dependencies...")
-        run_command(
-            f"{activate_cmd} && uv pip install -r requirements.txt", live_output=True
-        )
-        print("✓ Dependencies installed")
+        try:
+            run_command(
+                f"{activate_cmd} && uv add -r requirements.txt", live_output=True
+            )
+            print("✓ Dependencies installed")
+            # Sync uv to lockfile
+            print("\n🔄 Syncing uv to lockfile...")
+            run_command(f"{activate_cmd} && uv sync", live_output=True)
+            print("✓ uv synced to lockfile")
+        except SystemExit:
+            print("✗ Failed to install dependencies or sync uv")
+            sys.exit(1)
     else:
         print("\nℹ️ No requirements.txt found")
 
