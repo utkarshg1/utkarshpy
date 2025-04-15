@@ -19,10 +19,10 @@ utkarshpy
 - **Checks Python Version:** Ensures Python 3.6 or higher is installed.
 - **GitHub Authentication:** Verifies GitHub CLI installation and authenticates the user.
 - **Git Configuration:** Automatically sets up Git username and email from GitHub.
-- **Project Initialization:** Initializes a local Git repository.
+- **Project Initialization:** Initializes a local Git repository using `uv` if available.
 - **Essential Files Creation:** Generates `.gitignore`, `LICENSE`, and `README.md`.
 - **GitHub Repository Creation:** Creates a public or private GitHub repository and pushes the code.
-- **Virtual Environment Setup:** Creates and activates a virtual environment, then installs dependencies.
+- **Virtual Environment Setup:** Creates and activates a virtual environment using `uv`, then installs dependencies.
 - **VS Code Configuration:** Configures workspace settings for auto-save, formatting, and Jupyter.
 
 ## Step-by-Step Workflow
@@ -42,13 +42,14 @@ utkarshpy
 6. **Setup Git Configuration:**
    - Automatically sets the global Git username and email (or prompts for it).
 7. **Initialize Local Repository:**
-   - Runs `git init -b main` to initialize a new repository.
+   - Runs `uv init .` to initialize a new repository if `uv` is installed.
 8. **Create Essential Files:**
    - Downloads `.gitignore` for Python projects.
    - Fetches an Apache 2.0 `LICENSE` file.
    - Generates a `README.md` with a basic project description.
 9. **Setup Virtual Environment:**
-   - Creates a `venv` directory and installs dependencies from `requirements.txt` if available.
+   - Creates a `.venv` directory using `uv` and installs dependencies from `requirements.txt` if available.
+   - Upgrades `pip` and syncs `uv` to the lockfile.
 10. **Configure VS Code:**
     - Creates a `.vscode/settings.json` file with auto-save, Python formatting, and Jupyter settings.
 11. **Push Code to GitHub:**
