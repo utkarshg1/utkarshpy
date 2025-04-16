@@ -14,6 +14,14 @@ pip install utkarshpy
 utkarshpy
 ```
 
+## Demo
+
+Below is a quick demonstration of `utkarshpy` in action:
+
+![Demo of UtkarshPy](./demo/utkarshpy_demo.gif)
+
+This GIF shows how the tool automates the setup process, from initializing a repository to configuring VS Code.
+
 ## Features
 
 - **Checks Python Version:** Ensures Python 3.6 or higher is installed.
