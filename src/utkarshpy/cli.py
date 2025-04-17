@@ -222,14 +222,6 @@ def setup_virtualenv():
     else:
         print("\n✓ Virtual environment exists")
 
-    # Upgrade pip
-    print("\n🔄 Upgrading pip...")
-    try:
-        run_command(f"{activate_cmd} && uv pip install --upgrade pip", live_output=True)
-    except SystemExit:
-        print("✗ Failed to upgrade pip")
-        sys.exit(1)
-
     # Install requirements
     if os.path.exists("requirements.txt"):
         print("\n📦 Installing dependencies...")
