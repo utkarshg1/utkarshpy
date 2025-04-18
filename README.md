@@ -18,7 +18,7 @@ utkarshpy
 
 Below is a quick demonstration of `utkarshpy` in action:
 
-![Demo of UtkarshPy](./demo/utkarshpy_demo.gif)
+![Demo of UtkarshPy](https://github.com/utkarshg1/utkarshpy/blob/main/demo/utkarshpy_demo.gif)
 
 This GIF shows how the tool automates the setup process, from initializing a repository to configuring VS Code.
 
