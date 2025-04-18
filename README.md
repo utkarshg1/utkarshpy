@@ -4,6 +4,23 @@ CLI tool to automate Python project setup with GitHub integration and VS Code co
 
 ## Installation
 
+### Option 1: Install with pipx (Recommended)
+
+First, install pipx if you don't have it:
+
+```bash
+python -m pip install --user pipx
+python -m pipx ensurepath
+```
+
+Then install utkarshpy:
+
+```bash
+pipx install utkarshpy
+```
+
+### Option 2: Install with pip
+
 ```bash
 pip install utkarshpy
 ```
