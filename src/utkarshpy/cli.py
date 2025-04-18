@@ -71,8 +71,8 @@ def download_files(url, filename):
 # --- Setup Functions ---
 def check_python_version():
     """Verify Python version meets minimum requirements."""
-    if sys.version_info < (3, 6):
-        print("✗ Python 3.6 or higher required")
+    if sys.version_info < (3, 8):
+        print("✗ Python 3.8 or higher required")
         sys.exit(1)
 
 
