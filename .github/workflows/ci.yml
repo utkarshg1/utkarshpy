@@ -35,4 +35,9 @@ jobs:
 
       - name: Run tests
         run: |
-          pipx run utkarshpy pytest
+          pytest
+
+      - name: Test version and help commands
+        run: |
+          utkarshpy --version
+          utkarshpy --help
