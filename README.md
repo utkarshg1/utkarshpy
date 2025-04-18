@@ -4,6 +4,8 @@
 [![PyPI](https://img.shields.io/pypi/v/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
 [![License](https://img.shields.io/github/license/utkarshg1/utkarshpy)](https://github.com/utkarshg1/utkarshpy/blob/main/LICENSE)
+[![Install with pipx](https://img.shields.io/badge/Install%20with-pipx-ff69b4?logo=pypi)](https://pypa.github.io/pipx/)
+[![Demo](https://img.shields.io/badge/Demo-View%20GIF-blue)](https://github.com/utkarshg1/utkarshpy/blob/main/demo/utkarshpy_demo.gif)
 
 CLI tool to automate Python project setup with GitHub integration and VS Code configuration
 
