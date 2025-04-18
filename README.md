@@ -1,5 +1,10 @@
 # UtkarshPy
 
+[![CI](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml/badge.svg)](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
+[![License](https://img.shields.io/github/license/utkarshg1/utkarshpy)](https://github.com/utkarshg1/utkarshpy/blob/main/LICENSE)
+
 CLI tool to automate Python project setup with GitHub integration and VS Code configuration
 
 ## Installation
@@ -35,7 +40,7 @@ utkarshpy
 
 Below is a quick demonstration of `utkarshpy` in action:
 
-![Demo of UtkarshPy](https://github.com/utkarshg1/utkarshpy/blob/main/demo/utkarshpy_demo.gif)
+![Demo of UtkarshPy](https://raw.githubusercontent.com/utkarshg1/utkarshpy/main/demo/utkarshpy_demo.gif)
 
 This GIF shows how the tool automates the setup process, from initializing a repository to configuring VS Code.
 
