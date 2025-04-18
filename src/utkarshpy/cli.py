@@ -123,7 +123,7 @@ def initialize_local_repo():
     uv_check = run_command("uv --version", check=False)
     if uv_check.returncode != 0:
         print("\n✗ uv is not installed. Installing via pip...")
-        run_command(f"{sys.executable} -m pip install uv", live_output=True)
+        run_command("pip install uv", live_output=True)
 
     print("\n🔄 Initializing local uv git repository...")
     # do uv init
