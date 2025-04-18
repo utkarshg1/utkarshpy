@@ -8,6 +8,9 @@ import os
 import re
 import subprocess
 import sys
+import argparse
+
+from importlib.metadata import version as pkg_version
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -290,6 +293,31 @@ def has_origin_remote():
 
 # --- Main Flow ---
 def main():
+    parser = argparse.ArgumentParser(
+        description="Python Project Automator - Utkarsh Gaikwad",
+        epilog="""
+CLI tool to automate Python project setup with GitHub integration and VS Code configuration.
+
+Features:
+- Initializes a new Python project with best practices with uv
+- Sets up a GitHub repository and pushes initial commit
+- Configures VS Code workspace for Python development
+- Creates virtual environment and installs dependencies
+- Adds recommended .gitignore, LICENSE, and README.md files
+
+Author: Utkarsh Gaikwad\nGitHub: https://github.com/utkarshg1/utkarshpy
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"utkarshpy {pkg_version('utkarshpy')}",
+        help="Show the version and exit",
+    )
+    args, unknown = parser.parse_known_args()
+    # If only --help or --version is passed, argparse will handle and exit.
+
     try:
         print("\n🚀 Python Project Automator - Utkarsh Gaikwad 🚀")
         check_python_version()
