@@ -46,7 +46,7 @@ This GIF shows how the tool automates the setup process, from initializing a rep
 
 ## Features
 
-- **Checks Python Version:** Ensures Python 3.6 or higher is installed.
+- **Checks Python Version:** Ensures Python 3.8 or higher is installed.
 - **GitHub Authentication:** Verifies GitHub CLI installation and authenticates the user.
 - **Git Configuration:** Automatically sets up Git username and email from GitHub.
 - **Project Initialization:** Initializes a local Git repository using `uv` if available.
