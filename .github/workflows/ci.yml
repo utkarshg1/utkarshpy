@@ -33,9 +33,9 @@ jobs:
           pipx install .
           pipx inject utkarshpy pytest
 
-      - name: Run tests
+      - name: Run tests using pipx
         run: |
-          pytest
+          pipx run --spec pytest pytest
 
       - name: Test version and help commands
         run: |
