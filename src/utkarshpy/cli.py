@@ -176,7 +176,9 @@ def create_github_repo(repo_name, visibility="public"):
         )
 
         if commit_result and commit_result.returncode == 0:
-            print("✓ Initial commit created")
+            # Change branch name to main if not already set
+            run_command("git branch -M main")
+            print("✓ Initial commit created and branch renamed to 'main'")
         else:
             print("ℹ️ No changes to commit - creating empty repository")
 
