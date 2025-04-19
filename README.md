@@ -5,7 +5,11 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
 [![License](https://img.shields.io/github/license/utkarshg1/utkarshpy)](https://github.com/utkarshg1/utkarshpy/blob/main/LICENSE)
 [![Install with pipx](https://img.shields.io/badge/Install%20with-pipx-ff69b4?logo=pypi)](https://pypa.github.io/pipx/)
-[![Demo](https://img.shields.io/badge/Demo-View%20GIF-blue)](https://github.com/utkarshg1/utkarshpy/blob/main/demo/utkarshpy_demo.gif)
+[![Demo](https://img.shields.io/badge/Demo-Watch%20on%20YouTube-red?logo=youtube)](https://www.youtube.com/watch?v=TWTiICMrZwY)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/utkarshg1/utkarshpy/main/assets/logo.png" alt="UtkarshPy Logo" width="500"/>
+</p>
 
 CLI tool to automate Python project setup with GitHub integration and VS Code configuration
 
@@ -42,7 +46,11 @@ utkarshpy
 
 Below is a quick demonstration of `utkarshpy` in action:
 
-![Demo of UtkarshPy](https://raw.githubusercontent.com/utkarshg1/utkarshpy/main/demo/utkarshpy_demo.gif)
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=TWTiICMrZwY">
+    <img src="https://img.youtube.com/vi/TWTiICMrZwY/0.jpg" alt="Watch UtkarshPy Demo on YouTube" width="600"/>
+  </a>
+</p>
 
 This GIF shows how the tool automates the setup process, from initializing a repository to configuring VS Code.
 
