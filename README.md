@@ -46,17 +46,17 @@ utkarshpy
 
 Below is a quick demonstration of `utkarshpy` in action:
 
-Below is a quick demonstration of `utkarshpy` in action:
-
 <p align="center">
   <a href="https://www.youtube.com/watch?v=TWTiICMrZwY">
-    <img src="https://img.youtube.com/vi/TWTiICMrZwY/0.jpg" alt="UtkarshPy Demo" width="600" style="border: 3px solid red; border-radius: 8px;"/>
+    <img src="https://img.youtube.com/vi/TWTiICMrZwY/0.jpg" alt="UtkarshPy Demo" width="600" style="border: 2px solid #ff0000; border-radius: 8px"/>
   </a>
   <br>
-  <a href="https://www.youtube.com/watch?v=TWTiICMrZwY" style="display: inline-block; margin-top: 12px; background: red; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-family: Arial;">
-    ▶️ Click to Watch Demo
+  <a href="https://www.youtube.com/watch?v=TWTiICMrZwY" style="color: white; text-decoration: none; font-family: Arial; padding: 8px 16px; border-radius: 4px; background-color: #ff0000;">
+    ▶️ Watch Video Demo
   </a>
 </p>
+
+*Click the red button above to watch the demo*
 
 This Video shows how the tool automates the setup process, from initializing a repository to configuring VS Code.
 
