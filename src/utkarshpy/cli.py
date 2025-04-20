@@ -1,6 +1,7 @@
 """
 CLI tool to automate Python project setup with GitHub integration and VS Code configuration
 Created by Utkarsh Gaikwad
+Modified for cross-platform support
 """
 
 import json
@@ -9,6 +10,7 @@ import re
 import subprocess
 import sys
 import argparse
+import platform
 
 from importlib.metadata import version as pkg_version
 from urllib.error import HTTPError
@@ -202,12 +204,20 @@ def setup_virtualenv():
     """Create virtual environment and install dependencies."""
 
     venv_dir = ".venv"
+
     # Platform-specific activation commands
-    activate_cmd = (
-        f"{venv_dir}\\Scripts\\activate.bat"
-        if sys.platform == "win32"
-        else f"source {venv_dir}/bin/activate"
-    )
+    if sys.platform == "win32":
+        activate_cmd = f"{venv_dir}\\Scripts\\activate.bat"
+        # Windows does work with && in subprocess
+        install_cmd = f"{activate_cmd} && uv add -r requirements.txt"
+        sync_cmd = f"{activate_cmd} && uv sync"
+    else:  # Linux/Mac
+        activate_cmd = f"source {venv_dir}/bin/activate"
+        # For Linux/Mac, explicitly use bash -c with the commands in a single string
+        install_cmd = (
+            f"bash -c 'source {venv_dir}/bin/activate && uv add -r requirements.txt'"
+        )
+        sync_cmd = f"bash -c 'source {venv_dir}/bin/activate && uv sync'"
 
     # Check for pyproject.toml
     if not os.path.exists("pyproject.toml"):
@@ -231,13 +241,11 @@ def setup_virtualenv():
     if os.path.exists("requirements.txt"):
         print("\n📦 Installing dependencies...")
         try:
-            run_command(
-                f"{activate_cmd} && uv add -r requirements.txt", live_output=True
-            )
+            run_command(install_cmd, live_output=True)
             print("✓ Dependencies installed")
             # Sync uv to lockfile
             print("\n🔄 Syncing uv to lockfile...")
-            run_command(f"{activate_cmd} && uv sync", live_output=True)
+            run_command(sync_cmd, live_output=True)
             print("✓ uv synced to lockfile")
         except SystemExit:
             print("✗ Failed to install dependencies or sync uv")
@@ -259,6 +267,12 @@ def setup_vscode():
     if not os.path.exists(vscode_dir):
         os.makedirs(vscode_dir)
 
+    # Platform-specific Python interpreter path
+    if sys.platform == "win32":
+        python_path = "${workspaceFolder}/.venv/Scripts/python.exe"
+    else:  # Linux/Mac
+        python_path = "${workspaceFolder}/.venv/bin/python"
+
     settings = {
         "files.autoSave": "afterDelay",
         "files.autoSaveDelay": 1000,
@@ -267,10 +281,11 @@ def setup_vscode():
             "editor.formatOnSave": True,
             "editor.codeActionsOnSave": {"source.fixAll": "always"},
         },
-        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+        "python.defaultInterpreterPath": python_path,
         "jupyter.askForKernelRestart": False,
         "notebook.formatOnCellExecution": True,
         "notebook.codeActionsOnSave": {"notebook.source.fixAll": "explicit"},
+        "notebook.formatOnSave.enabled": True,
     }
 
     with open(settings_path, "w") as f:
@@ -322,6 +337,7 @@ Author: Utkarsh Gaikwad\nGitHub: https://github.com/utkarshg1/utkarshpy
 
     try:
         print("\n🚀 Python Project Automator - Utkarsh Gaikwad 🚀")
+        print(f"Platform detected: {platform.system()}")
         check_python_version()
 
         # Prevent execution if origin remote exists
