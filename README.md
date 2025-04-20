@@ -1,131 +1,156 @@
 # UtkarshPy
 
-[![CI](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml/badge.svg)](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
-[![License](https://img.shields.io/github/license/utkarshg1/utkarshpy)](https://github.com/utkarshg1/utkarshpy/blob/main/LICENSE)
-[![Install with pipx](https://img.shields.io/badge/Install%20with-pipx-ff69b4?logo=pypi)](https://pypa.github.io/pipx/)
-[![Demo](https://img.shields.io/badge/Demo-Watch%20on%20YouTube-red?logo=youtube)](https://www.youtube.com/watch?v=TWTiICMrZwY)
+![CI](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml/badge.svg) ![PyPI](https://img.shields.io/pypi/v/utkarshpy.svg) ![Python Versions](https://img.shields.io/pypi/pyversions/utkarshpy.svg) ![License](https://img.shields.io/github/license/utkarshg1/utkarshpy) ![Install with pipx](https://img.shields.io/badge/Install%20with-pipx-ff69b4?logo=pypi)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/utkarshg1/utkarshpy/main/assets/logo.png" alt="UtkarshPy Logo" width="500"/>
 </p>
 
-CLI tool to automate Python project setup with GitHub integration and VS Code configuration
+UtkarshPy is a CLI tool that streamlines Python project setup by automating:
+
+- Environment checks (Python version ≥ 3.8)
+- GitHub authentication and repository creation
+- Local Git initialization
+- Virtual environment setup with `uv`
+- VS Code workspace configuration
+
+---
 
 ## Installation
 
-### Option 1: Install with pipx (Recommended)
-
-First, install pipx if you don't have it:
+**Option 1: Install with pipx (Recommended)**
 
 ```bash
 python -m pip install --user pipx
 python -m pipx ensurepath
-```
-
-Then install utkarshpy:
-
-```bash
 pipx install utkarshpy
 ```
 
-### Option 2: Install with pip
+**Option 2: Install with pip**
 
 ```bash
 pip install utkarshpy
 ```
 
+---
+
 ## Usage
 
 ```bash
-utkarshpy
+utkarshpy [--version] [--no-push]
 ```
 
-## Demo
+- `--version`  
+  Show the tool version and exit.
+- `--no-push`  
+  Skip all GitHub-related operations: no authentication prompts, no remote creation or push.
 
-Below is a quick demonstration of `utkarshpy` in action:
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=TWTiICMrZwY">
-    <img src="https://img.youtube.com/vi/TWTiICMrZwY/0.jpg" alt="Demo" width="600"/>
-  </a>
-  <br>
-  🔴 <strong>Click the thumbnail above to watch the video!</strong> 🔴
-</p>
-
-This Video shows how the tool automates the setup process, from initializing a repository to configuring VS Code.
+---
 
 ## Features
 
-- **Checks Python Version:** Ensures Python 3.8 or higher is installed.
-- **GitHub Authentication:** Verifies GitHub CLI installation and authenticates the user.
-- **Git Configuration:** Automatically sets up Git username and email from GitHub.
-- **Project Initialization:** Initializes a local Git repository using `uv` if available.
-- **Essential Files Creation:** Generates `.gitignore`, `LICENSE`, and `README.md`.
-- **GitHub Repository Creation:** Creates a public or private GitHub repository and pushes the code.
-- **Virtual Environment Setup:** Creates and activates a virtual environment using `uv`, then installs dependencies.
-- **VS Code Configuration:** Configures workspace settings for auto-save, formatting, and Jupyter.
+- **Python Version Check**: Verifies that Python 3.8 or higher is installed.
+- **GitHub Integration**: Uses GitHub CLI (`gh`) for authentication, repository creation, and push.
+- **Skip GitHub Operations**: `--no-push` flag performs local setup without creating or pushing to GitHub.
+- **Local Git Setup**: Initializes a new Git repository and generates `.gitignore`, `LICENSE`, and `README.md`.
+- **Virtual Environment**: Creates a `.venv` via `uv` and installs dependencies from `requirements.txt`.
+- **VS Code Configuration**: Generates `.vscode/settings.json` with auto-save, formatting, and Jupyter settings.
+
+---
 
 ## Step-by-Step Workflow
 
-1. **Run the CLI Tool:**
+1. **Invoke the CLI**
    ```bash
-   utkarshpy
+   utkarshpy [--no-push]
    ```
-2. **Enter the Repository Name:**
-   - The tool prompts you to enter a name for your GitHub repository.
-3. **Choose Repository Visibility:**
-   - Select `public` or `private` (default is `public`).
-4. **Verify GitHub CLI Installation:**
-   - If `gh` is not installed, the tool provides a download link.
-5. **Authenticate with GitHub:**
-   - If not logged in, the tool prompts GitHub authentication via the browser.
-6. **Setup Git Configuration:**
-   - Automatically sets the global Git username and email (or prompts for it).
-7. **Initialize Local Repository:**
-   - Runs `uv init .` to initialize a new repository if `uv` is installed.
-8. **Create Essential Files:**
-   - Downloads `.gitignore` for Python projects.
-   - Fetches an Apache 2.0 `LICENSE` file.
-   - Generates a `README.md` with a basic project description.
-9. **Setup Virtual Environment:**
-   - Creates a `.venv` directory using `uv` and installs dependencies from `requirements.txt` if available.
-   - Upgrades `pip` and syncs `uv` to the lockfile.
-10. **Configure VS Code:**
-    - Creates a `.vscode/settings.json` file with auto-save, Python formatting, and Jupyter settings.
-11. **Push Code to GitHub:**
-    - Adds and commits files.
-    - Creates the GitHub repository using `gh repo create`.
-    - Pushes the initial commit to GitHub.
-12. **Setup Complete:**
-    - The repository is now available on GitHub.
-    - Displays repository URL and local project path.
+2. **(Optional) Enter Repository Name & Visibility**
+   - If `--no-push` is omitted, you'll be prompted:
+     - **Repository Name** (only letters, numbers, `-`, and `_`)
+     - **Visibility** (`public` or `private`, default: `public`)
+3. **GitHub CLI Check & Authentication**
+   - Verifies `gh` installation or prompts to install.
+   - Runs `gh auth login` if not already authenticated.
+4. **Git Configuration**
+   - Sets global `user.name` and `user.email` from your GitHub account or prompts for input.
+5. **Local Initialization**
+   - Installs `uv` if missing.
+   - Runs `uv init .` to create project files and removes redundant `.gitignore`.
+6. **File Generation**
+   - Downloads a Python-specific `.gitignore`.
+   - Fetches an Apache 2.0 `LICENSE`.
+   - Creates a basic `README.md`.
+7. **Virtual Environment & Dependencies**
+   - Ensures `pyproject.toml` exists or errors.
+   - Creates `.venv` via `uv venv`.
+   - Installs `requirements.txt` (if present) and syncs lockfile.
+8. **VS Code Setup**
+   - Writes `.vscode/settings.json` with recommended Python and Jupyter settings.
+9. **(GitHub Only) Repository Creation & Push**
+   - If `--no-push` is **not** used:
+     - Commits initial files and renames branch to `main`.
+     - Executes `gh repo create` with chosen visibility.
+     - Pushes to `origin` and displays the repository URL.
+   - If `--no-push` **is** used:
+     - Skips authentication, remote creation, and push entirely.
+
+---
 
 ## Example Output
 
+### Standard Run (with GitHub push)
+
 ```
 🚀 Python Project Automator - Utkarsh Gaikwad 🚀
+Platform detected: Linux
 
 Enter GitHub repository name: my-project
 Visibility [public/private] (default: public): public
 ✓ GitHub authentication verified
 ⚙️ Checking Git configuration...
-✓ Local repository initialized
+✓ Initialized uv folder
 📂 Creating project structure...
 ✓ Downloaded .gitignore
 ✓ Created README.md
 🔄 Creating virtual environment...
 ✓ Virtual environment created
-🔄 Installing dependencies...
+📦 Installing dependencies...
 ✓ Dependencies installed
+✓ uv synced to lockfile
 ✓ VS Code settings configured with your new settings!
 🔄 Creating public repository 'my-project'...
-✓ Repository created: https://github.com/your-username/my-project
+✓ Repository created and pushed: https://github.com/username/my-project
 
-✅ Setup Complete!
-➤ Repository: https://github.com/your-username/my-project
+✅ Setup Complete! Repository: https://github.com/username/my-project
 ➤ Local path: /path/to/my-project
 ```
 
+### Local-Only Run (skip GitHub)
+
+```bash
+utkarshpy --no-push
+```
+
+```
+🚀 Python Project Automator - Utkarsh Gaikwad 🚀
+Platform detected: Linux
+⚠️  --no-push mode: skipping all GitHub prompts and authentication
+🔄 Initializing local uv git repository...
+📂 Creating project structure...
+🔄 Creating virtual environment...
+📦 No requirements.txt found
+✓ Virtual environment exists
+✓ VS Code settings configured with your new settings!
+
+✅ Setup Complete! (no GitHub repo created)
+➤ Local path: /path/to/project
+```
+
+---
+
+## License
+
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+---
 This CLI tool saves time by automating tedious setup tasks, ensuring a consistent and streamlined workflow for Python projects!
