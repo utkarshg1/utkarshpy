@@ -128,11 +128,8 @@ def setup_git_config():
         run_command(f'git config --global user.email "{email}"')
 
 
-def initialize_local_repo():
-    """Initialize Git repository in current directory."""
-    if os.path.exists(".git"):
-        print("✓ Git repository already exists")
-        return
+def initialize_uv():
+    """Initialize uv with Git repository in current directory."""
 
     # Check if uv is installed
     uv_check = run_command("uv --version", check=False)
@@ -174,37 +171,44 @@ def create_basic_files():
     print("✓ Created README.md")
 
 
-def create_github_repo(repo_name, visibility="public"):
+def create_github_repo(repo_name, visibility="public", push=True):
     """Create GitHub repository in current directory."""
+
     print(f"\n🔄 Creating {visibility} repository '{repo_name}'...")
 
     try:
-        # Stage and attempt initial commit
-        run_command("git add .")
-        commit_result = run_command(
-            'git commit -m "Initial commit"',
-            check=False,  # Don't fail if empty
-            live_output=False,
-        )
+        if push:
+            # Stage and commit locally
+            run_command("git add .")
+            commit_result = run_command(
+                'git commit -m "Initial commit"',
+                check=False,
+                live_output=False,
+            )
+            if commit_result and commit_result.returncode == 0:
+                run_command("git branch -M main")
+                print("✓ Initial commit created and branch renamed to 'main'")
+            else:
+                print("ℹ️ No changes to commit - creating empty repository")
 
-        if commit_result and commit_result.returncode == 0:
-            # Change branch name to main if not already set
-            run_command("git branch -M main")
-            print("✓ Initial commit created and branch renamed to 'main'")
+            # Create remote and push
+            gh_cmd = (
+                f"gh repo create {repo_name}"
+                f" --{visibility}"
+                f" --source=."
+                f" --remote=origin"
+                f" --push"
+            )
+            run_command(gh_cmd)
+            github_username = get_github_username()
+            repo_url = f"https://github.com/{github_username}/{repo_name}"
+            print(f"✓ Repository created and pushed: {repo_url}")
+            return repo_url
+
         else:
-            print("ℹ️ No changes to commit - creating empty repository")
+            print("⚠️ Skipping all Git and GitHub operations (no-push mode)")
+            return None
 
-        # Create repository with GitHub CLI
-        run_command(
-            f"gh repo create {repo_name} --{visibility} --source=. --remote=origin --push"
-        )
-
-        # Get repository URL
-        github_username = get_github_username()
-        repo_url = f"https://github.com/{github_username}/{repo_name}"
-
-        print(f"✓ Repository created: {repo_url}")
-        return repo_url
     except Exception as e:
         print(f"✗ Repository creation failed: {str(e)}")
         sys.exit(1)
@@ -342,22 +346,26 @@ Author: Utkarsh Gaikwad\nGitHub: https://github.com/utkarshg1/utkarshpy
         version=f"utkarshpy {pkg_version('utkarshpy')}",
         help="Show the version and exit",
     )
-    args, unknown = parser.parse_known_args()
-    # If only --help or --version is passed, argparse will handle and exit.
+    parser.add_argument(
+        "--no-push",
+        dest="no_push",
+        action="store_true",
+        help="Skip all GitHub operations (no prompts, no remote creation/push)",
+    )
+    args = parser.parse_args()
 
-    try:
-        print("\n🚀 Python Project Automator - Utkarsh Gaikwad 🚀")
-        print(f"Platform detected: {platform.system()}")
-        check_python_version()
+    print("\n🚀 Python Project Automator - Utkarsh Gaikwad 🚀")
+    print(f"Platform detected: {platform.system()}")
+    check_python_version()
 
-        # Prevent execution if origin remote exists
-        if is_git_repo() and has_origin_remote():
-            print(
-                "\n✗ This script should be used for first-time repository setup only."
-            )
-            print("   Remote 'origin' already exists - aborting.")
-            sys.exit(1)
+    # Prevent execution if this directory already has an 'origin' remote
+    if is_git_repo() and has_origin_remote():
+        print("\n✗ This script should be used for first-time repository setup only.")
+        print("   Remote 'origin' already exists - aborting.")
+        sys.exit(1)
 
+    # Only ask for GitHub repo details if we're going to push
+    if not args.no_push:
         # Get repository info
         repo_name = ""
         while not repo_name:
@@ -371,23 +379,32 @@ Author: Utkarsh Gaikwad\nGitHub: https://github.com/utkarshg1/utkarshpy
         )
         visibility = visibility if visibility in ["public", "private"] else "public"
 
-        # Setup workflow
+        # Ensure GitHub CLI is installed
         if not check_gh_installed():
             sys.exit(1)
 
         github_auth()
         setup_git_config()
-        initialize_local_repo()
-        create_basic_files()
-        # Development environment setup
-        setup_virtualenv()
-        setup_vscode()
-        repo_url = create_github_repo(repo_name, visibility)
+    else:
+        if os.path.exists(".venv") and os.path.exists("pyproject.toml"):
+            print(
+                "\n✗ This script should be used for first-time repository setup only."
+            )
+            print("   Detected existing `.venv` and `pyproject.toml`. No changes made.")
+            sys.exit(0)
+        print("⚠️  --no-push mode: skipping all GitHub prompts and authentication")
 
-        # Final output
-        print("\n✅ Setup Complete!")
-        print(f"➤ Repository: {repo_url}")
-        print(f"➤ Local path: {os.getcwd()}")
-    except KeyboardInterrupt:
-        print("\n\n❌ Operation cancelled by user")
-        sys.exit(1)
+    # Local setup (always runs)
+    initialize_uv()
+    create_basic_files()
+    setup_virtualenv()
+    setup_vscode()
+
+    # Remote creation (only if not no_push)
+    if not args.no_push:
+        repo_url = create_github_repo(repo_name, visibility, push=True)
+        print(f"\n✅ Setup Complete! Repository: {repo_url}")
+    else:
+        print("\n✅ Setup Complete! (no GitHub repo created)")
+
+    print(f"➤ Local path: {os.getcwd()}")
