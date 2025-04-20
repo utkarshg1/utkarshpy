@@ -11,6 +11,7 @@ import subprocess
 import sys
 import argparse
 import platform
+import shutil
 
 from importlib.metadata import version as pkg_version
 from urllib.error import HTTPError
@@ -26,11 +27,19 @@ class MissingPyprojectTomlError(Exception):
 # --- Utility Functions ---
 def run_command(command, check=True, live_output=False):
     """Run a shell command with error handling and optional real-time output."""
+
+    if sys.platform == "win32":
+        shell_exec = os.environ.get("COMSPEC", "cmd.exe")  # Windows default shell
+    else:
+        # Prefer detected bash, fallback to /bin/bash
+        shell_exec = shutil.which("bash") or "/bin/bash"
+
     try:
         if live_output:
             process = subprocess.Popen(
                 command,
                 shell=True,
+                executable=shell_exec,
                 stdout=sys.stdout,
                 stderr=sys.stderr,
                 text=True,
@@ -43,6 +52,7 @@ def run_command(command, check=True, live_output=False):
             result = subprocess.run(
                 command,
                 shell=True,
+                executable=shell_exec,
                 check=check,
                 text=True,
                 stdout=subprocess.PIPE,
