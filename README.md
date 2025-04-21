@@ -1,6 +1,11 @@
 # UtkarshPy
 
-![CI](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml/badge.svg) ![PyPI](https://img.shields.io/pypi/v/utkarshpy.svg) ![Python Versions](https://img.shields.io/pypi/pyversions/utkarshpy.svg) ![License](https://img.shields.io/github/license/utkarshg1/utkarshpy) ![Install with pipx](https://img.shields.io/badge/Install%20with-pipx-ff69b4?logo=pypi)
+[![CI](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml/badge.svg)](https://github.com/utkarshg1/utkarshpy/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/utkarshpy.svg)](https://pypi.org/project/utkarshpy/)
+[![License](https://img.shields.io/github/license/utkarshg1/utkarshpy)](https://github.com/utkarshg1/utkarshpy/blob/main/LICENSE)
+[![Install with pipx](https://img.shields.io/badge/Install%20with-pipx-ff69b4?logo=pypi)](https://pypa.github.io/pipx/)
+[![YouTube Demo](https://img.shields.io/badge/YouTube-Demo-red?logo=youtube)](https://www.youtube.com/watch?v=TWTiICMrZwY)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/utkarshg1/utkarshpy/main/assets/logo.png" alt="UtkarshPy Logo" width="500"/>
