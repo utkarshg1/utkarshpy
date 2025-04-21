@@ -16,6 +16,20 @@ UtkarshPy is a CLI tool that streamlines Python project setup by automating:
 
 ---
 
+## Demo
+
+Watch the tool in action:
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=TWTiICMrZwY" target="_blank">
+    <img src="https://img.youtube.com/vi/TWTiICMrZwY/maxresdefault.jpg" alt="UtkarshPy Demo Video" width="600" />
+  </a>
+  <br>
+  <strong>🎬 Click on the thumbnail above to watch the YouTube video! 🎬</strong>
+</p>
+
+---
+
 ## Installation
 
 **Option 1: Install with pipx (Recommended)**
@@ -53,7 +67,7 @@ utkarshpy [--version] [--no-push]
 - **GitHub Integration**: Uses GitHub CLI (`gh`) for authentication, repository creation, and push.
 - **Skip GitHub Operations**: `--no-push` flag performs local setup without creating or pushing to GitHub.
 - **Local Git Setup**: Initializes a new Git repository and generates `.gitignore`, `LICENSE`, and `README.md`.
-- **Virtual Environment**: Creates a `.venv` via `uv` and installs dependencies from `requirements.txt`.
+- **Virtual Environment**: Creates a `.venv` using `uv venv` and manages dependencies with `uv`.
 - **VS Code Configuration**: Generates `.vscode/settings.json` with auto-save, formatting, and Jupyter settings.
 
 ---
@@ -74,16 +88,18 @@ utkarshpy [--version] [--no-push]
 4. **Git Configuration**
    - Sets global `user.name` and `user.email` from your GitHub account or prompts for input.
 5. **Local Initialization**
-   - Installs `uv` if missing.
+   - Installs `uv` if not already installed.
    - Runs `uv init .` to create project files and removes redundant `.gitignore`.
 6. **File Generation**
-   - Downloads a Python-specific `.gitignore`.
-   - Fetches an Apache 2.0 `LICENSE`.
-   - Creates a basic `README.md`.
+   - Downloads a Python-specific `.gitignore` from GitHub.
+   - Fetches an Apache 2.0 `LICENSE` from apache/.github repository.
+   - Creates a basic `README.md` with project name.
 7. **Virtual Environment & Dependencies**
    - Ensures `pyproject.toml` exists or errors.
    - Creates `.venv` via `uv venv`.
-   - Installs `requirements.txt` (if present) and syncs lockfile.
+   - Installs `requirements.txt` (if present) using `uv add -r requirements.txt`.
+   - Syncs dependencies with `uv sync` to create/update lockfile.
+   - Provides activation instructions for the virtual environment.
 8. **VS Code Setup**
    - Writes `.vscode/settings.json` with recommended Python and Jupyter settings.
 9. **(GitHub Only) Repository Creation & Push**
@@ -117,6 +133,10 @@ Visibility [public/private] (default: public): public
 📦 Installing dependencies...
 ✓ Dependencies installed
 ✓ uv synced to lockfile
+
+🔌 Virtual environment activation:
+  source .venv/bin/activate
+
 ✓ VS Code settings configured with your new settings!
 🔄 Creating public repository 'my-project'...
 ✓ Repository created and pushed: https://github.com/username/my-project
@@ -138,8 +158,12 @@ Platform detected: Linux
 🔄 Initializing local uv git repository...
 📂 Creating project structure...
 🔄 Creating virtual environment...
+✓ Virtual environment created
 📦 No requirements.txt found
-✓ Virtual environment exists
+
+🔌 Virtual environment activation:
+  source .venv/bin/activate
+
 ✓ VS Code settings configured with your new settings!
 
 ✅ Setup Complete! (no GitHub repo created)
@@ -153,4 +177,5 @@ Platform detected: Linux
 This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ---
+
 This CLI tool saves time by automating tedious setup tasks, ensuring a consistent and streamlined workflow for Python projects!

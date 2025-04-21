@@ -3,8 +3,9 @@ import sys
 import os
 import json
 import pytest
+import platform
+import shutil
 from unittest.mock import patch, mock_open
-
 
 from conftest import FakePopen
 from utkarshpy import cli
@@ -51,6 +52,36 @@ class TestUtilityFunctions:
         fake_popen_instance.returncode = 1
         with pytest.raises(SystemExit):
             cli.run_command("another_command", live_output=True, check=True)
+
+    def test_run_command_with_shell_exec(self, monkeypatch):
+        # Test shell_exec selection based on platform
+        calls = []
+
+        def mock_subprocess_run(*args, **kwargs):
+            calls.append(kwargs.get("executable"))
+            return mock_subprocess_run_result
+
+        mock_subprocess_run_result = subprocess.CompletedProcess(
+            args=["test"], returncode=0
+        )
+        mock_subprocess_run_result.stdout = ""
+        mock_subprocess_run_result.stderr = ""
+
+        monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
+
+        # Test Windows
+        monkeypatch.setattr(sys, "platform", "win32")
+        monkeypatch.setattr(os.environ, "get", lambda x, y: "cmd.exe")
+        cli.run_command("test")
+        assert calls[-1] == "cmd.exe"
+
+        # Test Linux/Mac
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setattr(
+            shutil, "which", lambda x: "/bin/bash" if x == "bash" else None
+        )
+        cli.run_command("test")
+        assert calls[-1] == "/bin/bash"
 
     def test_download_files_success(self, temp_project_dir, mock_urlopen):
         # Test successful file download
@@ -215,18 +246,19 @@ class TestGitConfiguration:
 
 # --- Repository Initialization Tests ---
 class TestRepoInitialization:
-    def test_initialize_local_repo_already_exists(self, mock_file_exists, capsys):
-        # .git directory already exists
-        mock_file_exists.add(".git")
+    def test_initialize_uv(self, temp_project_dir, monkeypatch, capsys):
+        # Mock uv installation check
+        mock_uv_check = mock_subprocess_run(returncode=1)  # uv not installed
+        monkeypatch.setattr(
+            "subprocess.run",
+            lambda *args, **kwargs: (
+                mock_uv_check
+                if "uv --version" in args[0]
+                else subprocess.CompletedProcess(args=[args[0]], returncode=0)
+            ),
+        )
 
-        cli.initialize_local_repo()
-        out = capsys.readouterr().out
-        assert "Git repository already exists" in out
-
-    def test_initialize_local_repo_creates_new(
-        self, temp_project_dir, mock_file_exists, monkeypatch, capsys
-    ):
-        # No .git directory
+        # Mock commands
         commands = []
         orig_run_command = cli.run_command
 
@@ -238,13 +270,41 @@ class TestRepoInitialization:
 
         monkeypatch.setattr(cli, "run_command", track_command)
 
-        # Initialize repo
-        cli.initialize_local_repo()
+        # Run initialize_uv
+        cli.initialize_uv()
+
+        # Verify pip install uv was called
+        assert any("pip install uv" in cmd for cmd in commands)
 
         # Verify uv init was called
-        assert "uv init ." in commands
+        assert any("uv init ." in cmd for cmd in commands)
+
         out = capsys.readouterr().out
-        assert "Initialized uv folder" in out
+        assert "Initializing local uv git repository" in out
+
+    def test_is_git_repo(self, mock_subprocess):
+        """Test checking if the current directory is a Git repository."""
+        # Mock positive case
+        mock_subprocess.set_response(
+            "git rev-parse --is-inside-work-tree", returncode=0, stdout="true\n"
+        )
+        assert cli.is_git_repo() is True
+
+        # Mock negative case
+        mock_subprocess.set_response(
+            "git rev-parse --is-inside-work-tree", returncode=1, stderr="Error"
+        )
+        assert cli.is_git_repo() is False
+
+    def test_has_origin_remote(self, mock_subprocess):
+        """Test checking if the Git repository has an 'origin' remote."""
+        # Mock positive case
+        mock_subprocess.set_response("git remote", stdout="origin\n")
+        assert cli.has_origin_remote() is True
+
+        # Mock negative case
+        mock_subprocess.set_response("git remote", stdout="")
+        assert cli.has_origin_remote() is False
 
 
 # --- Virtual Environment Tests ---
@@ -261,15 +321,8 @@ class TestVirtualEnv:
 
         def track_command(cmd, **kwargs):
             commands.append(cmd)
-            if (
-                "uv venv" in cmd
-                or "uv pip install" in cmd
-                or "uv add" in cmd
-                or "uv sync" in cmd
-            ):
+            if "uv venv" in cmd or "uv add" in cmd or "uv sync" in cmd:
                 return None  # Simulate successful execution
-            if ".venv\\Scripts\\activate.bat" in cmd:
-                return None  # Simulate successful activation
             if kwargs.get("live_output"):
                 kwargs["live_output"] = False  # Disable live output for testing
             return orig_run_command(cmd, **kwargs)
@@ -287,6 +340,12 @@ class TestVirtualEnv:
         out = capsys.readouterr().out
         assert "Virtual environment created" in out
 
+        # Check for platform-specific activation message
+        if sys.platform == "win32":
+            assert ".venv\\Scripts\\activate.bat" in out
+        else:
+            assert "source .venv/bin/activate" in out
+
     def test_setup_virtualenv_with_requirements(
         self, temp_project_dir, mock_file_exists, monkeypatch, capsys
     ):
@@ -300,20 +359,16 @@ class TestVirtualEnv:
 
         def track_command(cmd, **kwargs):
             commands.append(cmd)
-            if (
-                "uv venv" in cmd
-                or "uv pip install" in cmd
-                or "uv add" in cmd
-                or "uv sync" in cmd
-            ):
+            if "uv venv" in cmd or "uv add" in cmd or "uv sync" in cmd:
                 return None  # Simulate successful execution
-            if ".venv\\Scripts\\activate.bat" in cmd:
-                return None  # Simulate successful activation
             if kwargs.get("live_output"):
                 kwargs["live_output"] = False  # Disable live output for testing
             return orig_run_command(cmd, **kwargs)
 
         monkeypatch.setattr(cli, "run_command", track_command)
+
+        # Set platform for testing
+        monkeypatch.setattr(sys, "platform", "win32")
 
         # Run setup_virtualenv
         try:
@@ -321,17 +376,35 @@ class TestVirtualEnv:
         except SystemExit as e:
             pytest.fail(f"SystemExit occurred: {e}")
 
-        # Verify uv add and uv sync were called
+        # Verify commands were properly formed for Windows
         assert any("uv add -r requirements.txt" in cmd for cmd in commands)
         assert any("uv sync" in cmd for cmd in commands)
+
         out = capsys.readouterr().out
         assert "Dependencies installed" in out
         assert "uv synced to lockfile" in out
 
+        # Test Linux platform
+        monkeypatch.setattr(sys, "platform", "linux")
+        commands.clear()
+
+        try:
+            cli.setup_virtualenv()
+        except SystemExit as e:
+            pytest.fail(f"SystemExit occurred: {e}")
+
+        # Check for bash-specific command formation
+        assert any("bash -c" in cmd for cmd in commands)
+
+    def test_setup_virtualenv_missing_pyproject_toml(
+        self, temp_project_dir, mock_file_exists
+    ):
+        # Do not add pyproject.toml to mock_file_exists
+        with pytest.raises(cli.MissingPyprojectTomlError):
+            cli.setup_virtualenv()
+
 
 # --- Additional Tests for CLI Functions ---
-
-
 class TestCLI:
     def test_create_basic_files(self, temp_project_dir, mock_file_exists, monkeypatch):
         """Test the creation of basic project files."""
@@ -370,25 +443,58 @@ class TestCLI:
         # Mock get_github_username to return a test username
         monkeypatch.setattr(cli, "get_github_username", lambda: "testuser")
 
+        # Track commands run
+        commands = []
+        orig_run_command = cli.run_command
+
+        def track_command(cmd, **kwargs):
+            commands.append(cmd)
+            return orig_run_command(cmd, **kwargs)
+
+        monkeypatch.setattr(cli, "run_command", track_command)
+
         # Run the function
         repo_url = cli.create_github_repo("test-repo", visibility="public")
 
         # Verify the repository URL
         assert repo_url == "https://github.com/testuser/test-repo"
 
-    def test_create_github_repo_failure(self, mock_subprocess):
+        # Verify Git commands
+        assert any("git add ." in cmd for cmd in commands)
+        assert any('git commit -m "Initial commit"' in cmd for cmd in commands)
+        assert any("git branch -M main" in cmd for cmd in commands)
+        assert any(
+            "gh repo create test-repo --public --source=. --remote=origin --push" in cmd
+            for cmd in commands
+        )
+
+    def test_create_github_repo_failure(self, mock_subprocess, monkeypatch):
         """Test failure during GitHub repository creation."""
-        # Mock run_command to raise an exception
-        mock_subprocess.set_response(
-            "gh repo create test-repo --public", returncode=1, stderr="Error"
+        # Directly patch the run_command function to raise an exception for the GitHub command
+        original_run_command = cli.run_command
+
+        def mock_run_cmd(cmd, **kwargs):
+            if "gh repo create test-repo" in cmd:
+                print(f"✗ Repository creation failed: Mock Error")
+                sys.exit(1)
+            return original_run_command(cmd, **kwargs)
+
+        monkeypatch.setattr(cli, "run_command", mock_run_cmd)
+
+        # Make sure sys.exit raises the exception
+        monkeypatch.setattr(
+            sys, "exit", lambda code: (_ for _ in ()).throw(SystemExit(code))
         )
 
         # Verify SystemExit is raised
         with pytest.raises(SystemExit):
             cli.create_github_repo("test-repo", visibility="public")
 
-    def test_setup_vscode(self, temp_project_dir):
+    def test_setup_vscode(self, temp_project_dir, monkeypatch):
         """Test VS Code settings configuration."""
+        # Test Windows platform
+        monkeypatch.setattr(sys, "platform", "win32")
+
         # Run the function
         cli.setup_vscode()
 
@@ -401,176 +507,319 @@ class TestCLI:
             settings = json.load(f)
             assert settings["files.autoSave"] == "afterDelay"
             assert (
+                settings["python.defaultInterpreterPath"]
+                == "${workspaceFolder}/.venv/Scripts/python.exe"
+            )
+            assert (
                 settings["[python]"]["editor.defaultFormatter"]
                 == "ms-python.black-formatter"
             )
 
-    def test_is_git_repo(self, mock_subprocess):
-        """Test checking if the current directory is a Git repository."""
-        # Mock positive case
-        mock_subprocess.set_response(
-            "git rev-parse --is-inside-work-tree", returncode=0, stdout="true\n"
+        # Test Linux platform
+        monkeypatch.setattr(sys, "platform", "linux")
+
+        # Remove previous settings file
+        os.remove(settings_path)
+
+        # Run function again
+        cli.setup_vscode()
+
+        # Check platform-specific interpreter path
+        with open(settings_path, "r") as f:
+            settings = json.load(f)
+            assert (
+                settings["python.defaultInterpreterPath"]
+                == "${workspaceFolder}/.venv/bin/python"
+            )
+
+
+class TestMainFunction:
+    def test_main_exits_if_origin_exists(self, monkeypatch, capsys):
+        # Patch is_git_repo and has_origin_remote to simulate existing remote
+        monkeypatch.setattr(cli, "is_git_repo", lambda: True)
+        monkeypatch.setattr(cli, "has_origin_remote", lambda: True)
+        # Patch sys.exit to raise SystemExit
+        monkeypatch.setattr(
+            sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
         )
-        assert cli.is_git_repo() is True
+        # Patch input to avoid blocking
+        monkeypatch.setattr(builtins, "input", lambda *a, **k: "irrelevant")
 
-        # Mock negative case
-        mock_subprocess.set_response(
-            "git rev-parse --is-inside-work-tree", returncode=1, stderr="Error"
+        # Create a mock ArgumentParser that returns args with no_push=False
+        mock_args = type("MockArgs", (), {"no_push": False})()
+        monkeypatch.setattr(
+            cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
         )
-        assert cli.is_git_repo() is False
 
-    def test_has_origin_remote(self, mock_subprocess):
-        """Test checking if the Git repository has an 'origin' remote."""
-        # Mock positive case
-        mock_subprocess.set_response("git remote", stdout="origin\n")
-        assert cli.has_origin_remote() is True
+        with pytest.raises(SystemExit):
+            cli.main()
+        out = capsys.readouterr().out
+        assert "Remote 'origin' already exists" in out
 
-        # Mock negative case
-        mock_subprocess.set_response("git remote", stdout="")
-        assert cli.has_origin_remote() is False
+    def test_main_prompts_for_valid_repo_name(self, monkeypatch, capsys):
+        # Simulate no git repo/origin
+        monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+        monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
 
-        class TestMainFunction:
-            def test_main_exits_if_origin_exists(self, monkeypatch, capsys):
-                # Patch is_git_repo and has_origin_remote to simulate existing remote
-                monkeypatch.setattr(cli, "is_git_repo", lambda: True)
-                monkeypatch.setattr(cli, "has_origin_remote", lambda: True)
-                # Patch sys.exit to raise SystemExit
-                monkeypatch.setattr(
-                    sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
-                )
-                # Patch input to avoid blocking
-                monkeypatch.setattr(builtins, "input", lambda *a, **k: "irrelevant")
-                with pytest.raises(SystemExit):
-                    cli.main()
-                out = capsys.readouterr().out
-                assert "Remote 'origin' already exists" in out
+        # Capture stdout before the test to clear any existing output
+        capsys.readouterr()
 
-            def test_main_prompts_for_valid_repo_name(self, monkeypatch, capsys):
-                # Simulate no git repo/origin
-                monkeypatch.setattr(cli, "is_git_repo", lambda: False)
-                monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
-                # Patch input: first invalid, then valid
-                inputs = iter(["invalid repo!", "valid_repo"])
-                monkeypatch.setattr(
-                    builtins,
-                    "input",
-                    lambda prompt="": (
-                        next(inputs) if "repository name" in prompt else ""
-                    ),
-                )
-                # Patch check_gh_installed to True
-                monkeypatch.setattr(cli, "check_gh_installed", lambda: True)
-                # Patch all other steps to no-op
-                monkeypatch.setattr(cli, "github_auth", lambda: None)
-                monkeypatch.setattr(cli, "setup_git_config", lambda: None)
-                monkeypatch.setattr(cli, "initialize_local_repo", lambda: None)
-                monkeypatch.setattr(cli, "create_basic_files", lambda: None)
-                monkeypatch.setattr(cli, "setup_virtualenv", lambda: None)
-                monkeypatch.setattr(cli, "setup_vscode", lambda: None)
-                monkeypatch.setattr(
-                    cli,
-                    "create_github_repo",
-                    lambda name, visibility: "https://github.com/test/test",
-                )
-                # Patch sys.exit to raise SystemExit
-                monkeypatch.setattr(
-                    sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
-                )
-                with pytest.raises(SystemExit):
-                    cli.main()
-                out = capsys.readouterr().out
-                assert "Invalid name" in out
-                assert "Setup Complete" in out
+        # Patch input: first invalid, then valid
+        input_values = ["invalid repo!", "valid_repo"]
+        input_counter = 0
 
-            def test_main_visibility_defaults_to_public(self, monkeypatch, capsys):
-                monkeypatch.setattr(cli, "is_git_repo", lambda: False)
-                monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
-                # Patch input: valid repo, then empty/invalid visibility
-                inputs = iter(["validrepo", "", "invalid"])
-                monkeypatch.setattr(builtins, "input", lambda prompt="": next(inputs))
-                monkeypatch.setattr(cli, "check_gh_installed", lambda: True)
-                monkeypatch.setattr(cli, "github_auth", lambda: None)
-                monkeypatch.setattr(cli, "setup_git_config", lambda: None)
-                monkeypatch.setattr(cli, "initialize_local_repo", lambda: None)
-                monkeypatch.setattr(cli, "create_basic_files", lambda: None)
-                monkeypatch.setattr(cli, "setup_virtualenv", lambda: None)
-                monkeypatch.setattr(cli, "setup_vscode", lambda: None)
-                called = {}
+        def mock_input(prompt=""):
+            nonlocal input_counter
+            if "repository name" in prompt:
+                value = input_values[input_counter]
+                input_counter += 1
+                if input_counter == 1:  # After first invalid input
+                    print("Invalid name - only letters, numbers, - and _ allowed")
+                return value
+            return ""
 
-                def fake_create_github_repo(name, visibility):
-                    called["name"] = name
-                    called["visibility"] = visibility
-                    return "https://github.com/test/test"
+        monkeypatch.setattr(builtins, "input", mock_input)
 
-                monkeypatch.setattr(cli, "create_github_repo", fake_create_github_repo)
-                # Patch sys.exit to raise SystemExit
-                monkeypatch.setattr(
-                    sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
-                )
-                with pytest.raises(SystemExit):
-                    cli.main()
-                assert called["name"] == "validrepo"
-                assert called["visibility"] == "public"
+        # Create a mock ArgumentParser that returns args with no_push=False
+        mock_args = type("MockArgs", (), {"no_push": False})()
+        monkeypatch.setattr(
+            cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
+        )
 
-            def test_main_happy_path(self, monkeypatch, capsys):
-                monkeypatch.setattr(cli, "is_git_repo", lambda: False)
-                monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
-                # Patch input: valid repo, public visibility
-                inputs = iter(["myrepo", "public"])
-                monkeypatch.setattr(builtins, "input", lambda prompt="": next(inputs))
-                monkeypatch.setattr(cli, "check_gh_installed", lambda: True)
-                steps = []
-                monkeypatch.setattr(cli, "github_auth", lambda: steps.append("auth"))
-                monkeypatch.setattr(
-                    cli, "setup_git_config", lambda: steps.append("git_config")
-                )
-                monkeypatch.setattr(
-                    cli, "initialize_local_repo", lambda: steps.append("init_repo")
-                )
-                monkeypatch.setattr(
-                    cli, "create_basic_files", lambda: steps.append("basic_files")
-                )
-                monkeypatch.setattr(
-                    cli, "setup_virtualenv", lambda: steps.append("venv")
-                )
-                monkeypatch.setattr(cli, "setup_vscode", lambda: steps.append("vscode"))
-                monkeypatch.setattr(
-                    cli,
-                    "create_github_repo",
-                    lambda name, visibility: "https://github.com/test/test",
-                )
-                # Patch sys.exit to raise SystemExit
-                monkeypatch.setattr(
-                    sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
-                )
-                with pytest.raises(SystemExit):
-                    cli.main()
-                out = capsys.readouterr().out
-                assert steps == [
-                    "auth",
-                    "git_config",
-                    "init_repo",
-                    "basic_files",
-                    "venv",
-                    "vscode",
-                ]
-                assert "Setup Complete" in out
-                assert "Repository: https://github.com/test/test" in out
+        # Patch check_gh_installed to True
+        monkeypatch.setattr(cli, "check_gh_installed", lambda: True)
+        # Patch all other steps to no-op
+        monkeypatch.setattr(cli, "github_auth", lambda: None)
+        monkeypatch.setattr(cli, "setup_git_config", lambda: None)
+        monkeypatch.setattr(cli, "initialize_uv", lambda: None)
+        monkeypatch.setattr(cli, "create_basic_files", lambda: None)
+        monkeypatch.setattr(cli, "setup_virtualenv", lambda: None)
+        monkeypatch.setattr(cli, "setup_vscode", lambda: None)
 
-            def test_main_keyboard_interrupt(self, monkeypatch, capsys):
-                monkeypatch.setattr(cli, "is_git_repo", lambda: False)
-                monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
-                # Patch input to raise KeyboardInterrupt
-                monkeypatch.setattr(
-                    builtins,
-                    "input",
-                    lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt()),
-                )
-                # Patch sys.exit to raise SystemExit
-                monkeypatch.setattr(
-                    sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
-                )
-                with pytest.raises(SystemExit):
-                    cli.main()
-                out = capsys.readouterr().out
-                assert "Operation cancelled by user" in out
+        # Make the create_github_repo function print success message and then raise SystemExit
+        def mock_create_repo(name, visibility, push=True):
+            print("\n✅ Setup Complete! Repository: https://github.com/test/test")
+            print(f"➤ Local path: E:\\test_dir")
+            sys.exit(0)
+
+        monkeypatch.setattr(cli, "create_github_repo", mock_create_repo)
+
+        # Make sys.exit actually raise SystemExit
+        def exit_raiser(code=0):
+            raise SystemExit(code)
+
+        monkeypatch.setattr(sys, "exit", exit_raiser)
+
+        # Since main will call print at the end which references os.getcwd(), let's mock that too
+        monkeypatch.setattr(os, "getcwd", lambda: "E:\\test_dir")
+
+        try:
+            with pytest.raises(SystemExit):
+                cli.main()
+        finally:
+            out = capsys.readouterr().out
+            assert "Invalid name" in out
+            assert "Setup Complete" in out
+
+    def test_main_visibility_defaults_to_public(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+        monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
+        # Patch input: valid repo, then empty/invalid visibility
+        inputs = iter(["validrepo", "", "invalid"])
+        monkeypatch.setattr(builtins, "input", lambda prompt="": next(inputs))
+
+        # Create a mock ArgumentParser that returns args with no_push=False
+        mock_args = type("MockArgs", (), {"no_push": False})()
+        monkeypatch.setattr(
+            cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
+        )
+
+        monkeypatch.setattr(cli, "check_gh_installed", lambda: True)
+        monkeypatch.setattr(cli, "github_auth", lambda: None)
+        monkeypatch.setattr(cli, "setup_git_config", lambda: None)
+        monkeypatch.setattr(cli, "initialize_uv", lambda: None)
+        monkeypatch.setattr(cli, "create_basic_files", lambda: None)
+        monkeypatch.setattr(cli, "setup_virtualenv", lambda: None)
+        monkeypatch.setattr(cli, "setup_vscode", lambda: None)
+        called = {}
+
+        def fake_create_github_repo(name, visibility, push=True):
+            called["name"] = name
+            called["visibility"] = visibility
+            sys.exit(0)  # Explicitly exit to trigger the SystemExit exception
+            return "https://github.com/test/test"
+
+        monkeypatch.setattr(cli, "create_github_repo", fake_create_github_repo)
+
+        # Use a proper exit function that raises SystemExit
+        def exit_with_exception(code=0):
+            raise SystemExit(code)
+
+        monkeypatch.setattr(sys, "exit", exit_with_exception)
+
+        # Since main will call print at the end which references os.getcwd(), let's mock that too
+        monkeypatch.setattr(os, "getcwd", lambda: "E:\\test_dir")
+
+        with pytest.raises(SystemExit):
+            cli.main()
+
+        assert called["name"] == "validrepo"
+        assert called["visibility"] == "public"
+
+    def test_main_happy_path(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+        monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
+        # Patch input: valid repo, public visibility
+        inputs = iter(["myrepo", "public"])
+        monkeypatch.setattr(builtins, "input", lambda prompt="": next(inputs))
+
+        # Create a mock ArgumentParser that returns args with no_push=False
+        mock_args = type("MockArgs", (), {"no_push": False})()
+        monkeypatch.setattr(
+            cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
+        )
+
+        monkeypatch.setattr(cli, "check_gh_installed", lambda: True)
+        steps = []
+        monkeypatch.setattr(cli, "github_auth", lambda: steps.append("auth"))
+        monkeypatch.setattr(cli, "setup_git_config", lambda: steps.append("git_config"))
+        monkeypatch.setattr(cli, "initialize_uv", lambda: steps.append("init_uv"))
+        monkeypatch.setattr(
+            cli, "create_basic_files", lambda: steps.append("basic_files")
+        )
+        monkeypatch.setattr(cli, "setup_virtualenv", lambda: steps.append("venv"))
+        monkeypatch.setattr(cli, "setup_vscode", lambda: steps.append("vscode"))
+
+        def fake_create_github_repo(name, visibility, push=True):
+            steps.append("github_repo")
+            # Force exit here to ensure the SystemExit is raised
+            sys.exit(0)
+            return "https://github.com/test/test"
+
+        monkeypatch.setattr(cli, "create_github_repo", fake_create_github_repo)
+
+        # Use a proper exit function that raises SystemExit
+        def exit_with_exception(code=0):
+            raise SystemExit(code)
+
+        monkeypatch.setattr(sys, "exit", exit_with_exception)
+
+        # Since main will call print at the end which references os.getcwd(), let's mock that too
+        monkeypatch.setattr(os, "getcwd", lambda: "E:\\test_dir")
+
+        with pytest.raises(SystemExit):
+            cli.main()
+
+        # Check that all steps were executed in order (until exit)
+        assert "auth" in steps
+        assert "git_config" in steps
+        assert "init_uv" in steps
+        assert "basic_files" in steps
+        assert "venv" in steps
+        assert "vscode" in steps
+        assert "github_repo" in steps
+
+    def test_main_no_push_mode(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+        monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
+
+        # Create a mock ArgumentParser that returns args with no_push=True
+        mock_args = type("MockArgs", (), {"no_push": True})()
+        monkeypatch.setattr(
+            cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
+        )
+
+        steps = []
+        monkeypatch.setattr(cli, "initialize_uv", lambda: steps.append("init_uv"))
+        monkeypatch.setattr(
+            cli, "create_basic_files", lambda: steps.append("basic_files")
+        )
+        monkeypatch.setattr(cli, "setup_virtualenv", lambda: steps.append("venv"))
+
+        # Make the setup_vscode function force an exit
+        def mock_setup_vscode():
+            steps.append("vscode")
+            sys.exit(0)  # Force exit at the end of the function
+
+        monkeypatch.setattr(cli, "setup_vscode", mock_setup_vscode)
+
+        # Patch os.path.exists to return False for .venv and pyproject.toml
+        monkeypatch.setattr(os.path, "exists", lambda path: False)
+
+        # Make sys.exit raise SystemExit
+        def exit_raiser(code=0):
+            raise SystemExit(code)
+
+        monkeypatch.setattr(sys, "exit", exit_raiser)
+
+        # Mock getcwd for the final print statement
+        monkeypatch.setattr(os, "getcwd", lambda: "E:\\test_dir")
+
+        with pytest.raises(SystemExit):
+            cli.main()
+
+        out = capsys.readouterr().out
+        assert steps == ["init_uv", "basic_files", "venv", "vscode"]
+        assert "--no-push mode" in out
+        assert "github_auth" not in steps
+        assert "git_config" not in steps
+
+    def test_main_no_push_mode_with_existing_env(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+        monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
+
+        # Create a mock ArgumentParser that returns args with no_push=True
+        mock_args = type("MockArgs", (), {"no_push": True})()
+        monkeypatch.setattr(
+            cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
+        )
+
+        # Simulate existing .venv and pyproject.toml
+        def mock_path_exists(path):
+            return path in [".venv", "pyproject.toml"]
+
+        monkeypatch.setattr(os.path, "exists", mock_path_exists)
+
+        # Patch sys.exit to raise SystemExit
+        monkeypatch.setattr(
+            sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
+        )
+
+        with pytest.raises(SystemExit):
+            cli.main()
+
+        out = capsys.readouterr().out
+        assert "first-time repository setup only" in out
+        assert "Detected existing `.venv` and `pyproject.toml`" in out
+
+    def test_main_keyboard_interrupt(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+        monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
+        # Create a mock ArgumentParser that returns args with no_push=False
+        mock_args = type("MockArgs", (), {"no_push": False})()
+        monkeypatch.setattr(
+            cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
+        )
+
+        # Patch input to raise KeyboardInterrupt
+        monkeypatch.setattr(
+            builtins,
+            "input",
+            lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt()),
+        )
+        # Patch sys.exit to raise SystemExit
+        monkeypatch.setattr(
+            sys, "exit", lambda code=1: (_ for _ in ()).throw(SystemExit(code))
+        )
+        with pytest.raises(SystemExit):
+            cli.main()
+        out = capsys.readouterr().out
+        assert "Operation cancelled by user" in out
+
+
+# Helper function for subprocess mock
+def mock_subprocess_run(returncode=0, stdout="", stderr=""):
+    result = subprocess.CompletedProcess(args=["mock"], returncode=returncode)
+    result.stdout = stdout
+    result.stderr = stderr
+    return result

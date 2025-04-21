@@ -27,12 +27,21 @@ class FakeCompletedProcess:
 
 
 class FakePopen:
-    def __init__(self, command=None, shell=None, stdout=None, stderr=None, text=None):
+    def __init__(
+        self,
+        command=None,
+        shell=None,
+        stdout=None,
+        stderr=None,
+        text=None,
+        executable=None,
+    ):
         self.command = command
         self.shell = shell
         self.stdout = stdout if stdout is not None else io.StringIO()
         self.stderr = stderr if stderr is not None else io.StringIO()
         self.text = text
+        self.executable = executable
         self._returncode = 0
 
     def communicate(self):
@@ -74,26 +83,47 @@ class CommandRouter:
                 returncode=0, stdout="testuser\n"
             ),
             "uv --version": FakeCompletedProcess(returncode=0, stdout="uv 1.0.0\n"),
+            "uv init .": FakeCompletedProcess(returncode=0, stdout=""),
+            "uv venv": FakeCompletedProcess(returncode=0, stdout=""),
+            "uv add -r requirements.txt": FakeCompletedProcess(returncode=0, stdout=""),
+            "uv sync": FakeCompletedProcess(returncode=0, stdout=""),
             "git init -b main": FakeCompletedProcess(returncode=0, stdout=""),
             "git add .": FakeCompletedProcess(returncode=0, stdout=""),
-            "git commit -m 'Initial commit'": FakeCompletedProcess(
+            'git commit -m "Initial commit"': FakeCompletedProcess(
                 returncode=0, stdout=""
             ),
-            "gh repo create test-repo --public": FakeCompletedProcess(
+            "git branch -M main": FakeCompletedProcess(returncode=0, stdout=""),
+            "gh repo create test-repo --public --source=. --remote=origin --push": FakeCompletedProcess(
                 returncode=0, stdout="https://github.com/testuser/test-repo"
             ),
-            "gh repo create test-repo --private": FakeCompletedProcess(
+            "gh repo create test-repo --private --source=. --remote=origin --push": FakeCompletedProcess(
                 returncode=0, stdout="https://github.com/testuser/test-repo"
-            ),
-            "uv venv venv": FakeCompletedProcess(returncode=0, stdout=""),
-            "uv pip install -r requirements.txt": FakeCompletedProcess(
-                returncode=0, stdout=""
             ),
             "pip install uv": FakeCompletedProcess(returncode=0, stdout=""),
+            ".venv\\Scripts\\activate.bat && uv add -r requirements.txt": FakeCompletedProcess(
+                returncode=0, stdout=""
+            ),
+            ".venv\\Scripts\\activate.bat && uv sync": FakeCompletedProcess(
+                returncode=0, stdout=""
+            ),
+            "bash -c 'source .venv/bin/activate && uv add -r requirements.txt'": FakeCompletedProcess(
+                returncode=0, stdout=""
+            ),
+            "bash -c 'source .venv/bin/activate && uv sync'": FakeCompletedProcess(
+                returncode=0, stdout=""
+            ),
         }
 
     def run_command(
-        self, cmd, shell=True, check=True, text=True, stdout=None, stderr=None, **kwargs
+        self,
+        cmd,
+        shell=True,
+        check=True,
+        text=True,
+        stdout=None,
+        stderr=None,
+        executable=None,
+        **kwargs
     ):
         """Match commands and return appropriate responses"""
         # Try exact matches first
