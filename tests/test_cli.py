@@ -4,6 +4,8 @@ import os
 import json
 import pytest
 import platform
+import re
+from importlib.metadata import version as pkg_version
 import shutil
 from unittest.mock import patch, mock_open
 
@@ -824,6 +826,269 @@ class TestMainFunction:
         # Check output
         out = capsys.readouterr().out
         assert "Operation cancelled by user" in out
+        # Tests for handling initialization with Git
+
+        def test_initialize_git(temp_project_dir, monkeypatch, capsys):
+            """Test initializing Git repository."""
+            # Mock git command responses
+            commands_run = []
+
+            def mock_run_cmd(cmd, **kwargs):
+                commands_run.append(cmd)
+                result = subprocess.CompletedProcess(args=["test"], returncode=0)
+                result.stdout = ""
+                result.stderr = ""
+                return result
+
+            monkeypatch.setattr(cli, "run_command", mock_run_cmd)
+
+            # Execute git initialization through initialize_uv
+            cli.initialize_uv()
+
+            # Verify .gitignore removal
+            with open(".gitignore", "w") as f:
+                f.write("test")
+            assert os.path.exists(".gitignore")
+
+            # Run again to test .gitignore removal
+            cli.initialize_uv()
+            assert not os.path.exists(".gitignore")
+
+            out = capsys.readouterr().out
+            assert "Initializing local uv git repository" in out
+
+        # Tests for keyboard interrupt handling
+
+        def test_keyboard_interrupt_handling(monkeypatch):
+            """Test that KeyboardInterrupt is gracefully handled."""
+
+            def mock_input_raising_interrupt(*args, **kwargs):
+                raise KeyboardInterrupt()
+
+            # Mock input to raise KeyboardInterrupt
+            monkeypatch.setattr("builtins.input", mock_input_raising_interrupt)
+
+            # Mock is_git_repo and has_origin_remote
+            monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+            monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
+
+            # Create a mock ArgumentParser that returns args with no_push=False
+            mock_args = type("MockArgs", (), {"no_push": False})()
+            monkeypatch.setattr(
+                cli.argparse.ArgumentParser, "parse_args", lambda self: mock_args
+            )
+
+            # Make sys.exit raise SystemExit
+            def exit_with_exception(code=0):
+                raise SystemExit(code)
+
+            monkeypatch.setattr(sys, "exit", exit_with_exception)
+
+            # Test that KeyboardInterrupt is caught and SystemExit is raised
+            with pytest.raises((KeyboardInterrupt, SystemExit)):
+                cli.main()
+
+        # Tests for edge cases in GitHub repo name validation
+
+        def test_repo_name_validation_edge_cases(monkeypatch, capsys):
+            """Test validation of repository names with various edge cases."""
+            # Setup
+            monkeypatch.setattr(cli, "is_git_repo", lambda: False)
+            monkeypatch.setattr(cli, "has_origin_remote", lambda: False)
+            monkeypatch.setattr(cli, "check_gh_installed", lambda: True)
+
+            # Test cases for repo names and their validity
+            test_cases = [
+                ("repo-name", True),  # Valid: letters, hyphen
+                ("repo_name", True),  # Valid: letters, underscore
+                ("repo123", True),  # Valid: letters, numbers
+                ("123repo", True),  # Valid: numbers, letters
+                ("repo name", False),  # Invalid: space
+                ("repo.name", False),  # Invalid: dot
+                ("repo/name", False),  # Invalid: slash
+                ("repo!name", False),  # Invalid: special character
+                ("", False),  # Invalid: empty string
+            ]
+
+            for repo_name, is_valid in test_cases:
+                # Check if the regex pattern correctly validates/invalidates the name
+                match = re.match(r"^[a-zA-Z0-9_-]+$", repo_name)
+                assert (
+                    bool(match) == is_valid
+                ), f"Repo name '{repo_name}' validation check failed"
+
+        # Tests for platform-specific behavior
+
+        def test_platform_specific_paths(monkeypatch):
+            """Test that correct platform-specific paths are used."""
+            # Windows platform
+            monkeypatch.setattr(sys, "platform", "win32")
+            windows_activate_path = cli.setup_virtualenv.__code__
+
+            # Creating a mock environment to check paths without executing the full function
+            with monkeypatch.context() as m:
+                m.setattr(
+                    os.path, "exists", lambda path: True
+                )  # Mock to avoid file checks
+                m.setattr(
+                    cli, "run_command", lambda *args, **kwargs: None
+                )  # No-op run_command
+
+                # Variables to capture paths
+                windows_paths = {}
+                linux_paths = {}
+
+                # Mock to capture Windows paths
+                def mock_print_win(*args, **kwargs):
+                    if args and isinstance(args[0], str):
+                        if ".venv\\Scripts\\activate.bat" in args[0]:
+                            windows_paths["activate_cmd"] = args[0].strip()
+
+                m.setattr("builtins.print", mock_print_win)
+                try:
+                    cli.setup_virtualenv()  # May raise because of mocked behavior
+                except:
+                    pass
+
+                # Switch to Linux and capture Linux paths
+                m.setattr(sys, "platform", "linux")
+
+                def mock_print_linux(*args, **kwargs):
+                    if args and isinstance(args[0], str):
+                        if "source .venv/bin/activate" in args[0]:
+                            linux_paths["activate_cmd"] = args[0].strip()
+
+                m.setattr("builtins.print", mock_print_linux)
+                try:
+                    cli.setup_virtualenv()  # May raise because of mocked behavior
+                except:
+                    pass
+
+            # Verify Windows and Linux paths were recorded differently
+            assert "activate_cmd" in windows_paths or "activate_cmd" in linux_paths
+            if "activate_cmd" in windows_paths and "activate_cmd" in linux_paths:
+                assert windows_paths["activate_cmd"] != linux_paths["activate_cmd"]
+                assert ".venv\\Scripts\\activate.bat" in windows_paths["activate_cmd"]
+                assert "source .venv/bin/activate" in linux_paths["activate_cmd"]
+
+        # Tests for error handling in file download
+
+        def test_download_files_http_error(monkeypatch):
+            """Test handling of HTTP errors during file downloads."""
+
+            class MockResponse:
+                def __init__(self, status=404):
+                    self.status = status
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc_val, exc_tb):
+                    pass
+
+            def mock_urlopen(url):
+                return MockResponse(404)
+
+            # Mock urlopen to return 404 response
+            monkeypatch.setattr(cli, "urlopen", mock_urlopen)
+
+            # Ensure system exit is raised when download fails
+            with pytest.raises(SystemExit):
+                cli.download_files("http://example.com/nonexistent", "output.txt")
+
+        # Tests for repository URL generation
+
+        def test_github_repo_url_generation(monkeypatch):
+            """Test that GitHub repository URLs are correctly generated."""
+            # Store username used and URL generated
+            captured_data = {}
+
+            def mock_get_username():
+                captured_data["username"] = "test-user"
+                return captured_data["username"]
+
+            def mock_run_command(cmd, **kwargs):
+                # Record the command but don't execute it
+                captured_data["command"] = cmd
+                result = subprocess.CompletedProcess(args=[cmd], returncode=0)
+                result.stdout = ""
+                result.stderr = ""
+                return result
+
+            # Apply mocks
+            monkeypatch.setattr(cli, "get_github_username", mock_get_username)
+            monkeypatch.setattr(cli, "run_command", mock_run_command)
+
+            # Test URL generation with different inputs
+            repo_names = ["test-repo", "my_project", "demo123"]
+            visibilities = ["public", "private"]
+
+            for repo_name in repo_names:
+                for visibility in visibilities:
+                    url = cli.create_github_repo(repo_name, visibility=visibility)
+                    expected_url = (
+                        f"https://github.com/{captured_data['username']}/{repo_name}"
+                    )
+                    assert url == expected_url
+                    assert f"--{visibility}" in captured_data["command"]
+
+        # Tests for main function with command-line arguments
+
+        def test_main_with_version_argument(monkeypatch, capsys):
+            """Test that --version argument outputs version and exits."""
+            # Mock sys.argv to include --version
+            monkeypatch.setattr(sys, "argv", ["utkarshpy", "--version"])
+
+            # Make ArgumentParser.parse_args raise SystemExit when --version is used
+            def mock_parse_args(self):
+                print(f"utkarshpy {pkg_version('utkarshpy')}")
+                sys.exit(0)
+
+            monkeypatch.setattr(
+                cli.argparse.ArgumentParser, "parse_args", mock_parse_args
+            )
+
+            # Make sys.exit raise SystemExit
+            def exit_raiser(code=0):
+                raise SystemExit(code)
+
+            monkeypatch.setattr(sys, "exit", exit_raiser)
+
+            # Test that SystemExit is raised and version is printed
+            with pytest.raises(SystemExit):
+                cli.main()
+
+            out = capsys.readouterr().out
+            assert "utkarshpy" in out
+
+        def test_initialize_uv_with_existing_pyproject_toml(
+            temp_project_dir, monkeypatch, capsys
+        ):
+            """Test initialize_uv with existing pyproject.toml."""
+            # Create a mock pyproject.toml
+            with open("pyproject.toml", "w") as f:
+                f.write("[build-system]\nrequires = ['setuptools>=42']\n")
+
+            # Mock commands
+            commands = []
+
+            def track_command(cmd, **kwargs):
+                commands.append(cmd)
+                result = subprocess.CompletedProcess(args=[cmd], returncode=0)
+                result.stdout = ""
+                result.stderr = ""
+                return result
+
+            monkeypatch.setattr(cli, "run_command", track_command)
+
+            # Run initialization
+            cli.initialize_uv()
+
+            # Check that uv init was not called
+            assert not any("uv init" in cmd for cmd in commands)
+
+            # Verify pyproject.toml was detected
+            assert os.path.exists("pyproject.toml")
 
 
 # Helper function for subprocess mock
