@@ -38,14 +38,34 @@ class FakePopen:
     ):
         self.command = command
         self.shell = shell
-        self.stdout = stdout if stdout is not None else io.StringIO()
-        self.stderr = stderr if stderr is not None else io.StringIO()
+        # Ensure stdout and stderr are always StringIO objects
+        self.stdout = (
+            io.StringIO()
+            if stdout is None
+            else (stdout if hasattr(stdout, "getvalue") else io.StringIO(str(stdout)))
+        )
+        self.stderr = (
+            io.StringIO()
+            if stderr is None
+            else (stderr if hasattr(stderr, "getvalue") else io.StringIO(str(stderr)))
+        )
         self.text = text
         self.executable = executable
         self._returncode = 0
 
     def communicate(self):
-        return (self.stdout.getvalue(), self.stderr.getvalue())
+        # Always return strings from the StringIO objects
+        if hasattr(self.stdout, "getvalue"):
+            stdout_value = self.stdout.getvalue()
+        else:
+            stdout_value = str(self.stdout)
+
+        if hasattr(self.stderr, "getvalue"):
+            stderr_value = self.stderr.getvalue()
+        else:
+            stderr_value = str(self.stderr)
+
+        return (stdout_value, stderr_value)
 
     @property
     def returncode(self):
@@ -106,11 +126,17 @@ class CommandRouter:
             ".venv\\Scripts\\activate.bat && uv sync": FakeCompletedProcess(
                 returncode=0, stdout=""
             ),
+            ".venv\\Scripts\\activate.bat && uv run template.py": FakeCompletedProcess(
+                returncode=0, stdout="Generated extra folders and files"
+            ),
             "bash -c 'source .venv/bin/activate && uv add -r requirements.txt'": FakeCompletedProcess(
                 returncode=0, stdout=""
             ),
             "bash -c 'source .venv/bin/activate && uv sync'": FakeCompletedProcess(
                 returncode=0, stdout=""
+            ),
+            "bash -c 'source .venv/bin/activate && uv run template.py'": FakeCompletedProcess(
+                returncode=0, stdout="Generated extra folders and files"
             ),
         }
 

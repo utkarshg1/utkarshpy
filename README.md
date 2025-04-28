@@ -74,6 +74,7 @@ utkarshpy [--version] [--no-push]
 - **Local Git Setup**: Initializes a new Git repository and generates `.gitignore`, `LICENSE`, and `README.md`.
 - **Virtual Environment**: Creates a `.venv` using `uv venv` and manages dependencies with `uv`.
 - **VS Code Configuration**: Generates `.vscode/settings.json` with auto-save, formatting, and Jupyter settings.
+- **Custom Templates**: Automatically runs `template.py` if present to generate extra folders and files after dependencies are installed.
 
 ---
 
