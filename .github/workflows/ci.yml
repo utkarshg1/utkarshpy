@@ -26,43 +26,35 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build pytest
 
-      # For Python versions 3.12 and above, use pip directly instead of pipx
-      - name: Install project with pip (Python 3.12+)
-        if: ${{ startsWith(matrix.python-version, '3.12') || startsWith(matrix.python-version, '3.13') }}
+      # For Python 3.8, use pip directly instead of pipx
+      - name: Install project with pip (Python 3.8)
+        if: ${{ matrix.python-version == '3.8' }}
         run: |
           pip install -e .
+          pip install pytest
           pytest
 
-      # For Python versions below 3.12, use pipx as originally intended
-      - name: Install pipx (Python <3.12)
-        if: ${{ !startsWith(matrix.python-version, '3.12') && !startsWith(matrix.python-version, '3.13') }}
+      # For other Python versions, use pipx as originally intended
+      - name: Install pipx (Python != 3.8)
+        if: ${{ matrix.python-version != '3.8' }}
         run: |
           python -m pip install pipx
           python -m pipx ensurepath
 
-      - name: Install project and test dependencies with pipx (Python <3.12)
-        if: ${{ !startsWith(matrix.python-version, '3.12') && !startsWith(matrix.python-version, '3.13') }}
+      - name: Install project and test dependencies with pipx (Python != 3.8)
+        if: ${{ matrix.python-version != '3.8' }}
         run: |
           pipx install .
           pipx inject utkarshpy pytest
 
-      - name: Run tests using pipx (Python <3.12)
-        if: ${{ !startsWith(matrix.python-version, '3.12') && !startsWith(matrix.python-version, '3.13') }}
+      - name: Run tests using pipx (Python != 3.8)
+        if: ${{ matrix.python-version != '3.8' }}
         run: |
           pipx run --spec pytest pytest
 
-      # Run version and help commands for all Python versions, adapting to installation method
-      - name: Test version and help commands (Python 3.12+)
-        if: ${{ startsWith(matrix.python-version, '3.12') || startsWith(matrix.python-version, '3.13') }}
+      # Test version and help for all Python versions
+      - name: Test version and help commands
         run: |
           utkarshpy --version
           utkarshpy --help
-
-      - name: Test version and help commands (Python <3.12)
-        if: ${{ !startsWith(matrix.python-version, '3.12') && !startsWith(matrix.python-version, '3.13') }}
-        run: |
-          utkarshpy --version
-          utkarshpy --help
-  
